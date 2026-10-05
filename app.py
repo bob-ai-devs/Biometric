@@ -540,7 +540,11 @@ def run_gemini_analysis(ref_bytes, query_bytes, mode):
 - "weak_match": broadly similar and leaning match, but one or two notable differences or limited evidence keep it from being strong.
 - "inconclusive": the images do not allow a fair judgement (poor quality, partial sample, very little detail).
 - "verify": several notable differences or concerning signs in core traits; leaning mismatch but not conclusive - needs manual verification.
-- "mismatch": the fundamental structure or style clearly differs, or there are strong signs of tracing/imitation."""
+- "mismatch": the fundamental structure or style clearly differs, or there are strong signs of tracing/imitation.
+
+Also give a "match_score" from 0 to 100: how similar the two samples are overall. It must be consistent with your verdict:
+strong_match 85-100, weak_match 70-84, inconclusive 50-69, verify 25-49, mismatch 0-24. Use the position inside the band to
+reflect how strong the evidence is (e.g. a near-identical pair is ~97, a borderline strong match is ~86)."""
 
     prompt = f"""You are assisting a bank's document-verification reviewer.
 Compare Image 1 (REFERENCE, ground truth) with Image 2 (QUERY, to verify). Both are {mode.lower()} samples.
@@ -554,6 +558,7 @@ Do not claim legal or forensic certainty - this is a screening aid for a human r
 Return ONLY a JSON object with exactly these keys:
 {{
   "verdict": "strong_match" | "weak_match" | "inconclusive" | "verify" | "mismatch",
+  "match_score": integer 0-100 (see the bands above),
   "confidence": integer 0-100 (your confidence in the verdict),
   "summary": "2-3 sentence reviewer-style explanation of the decisive evidence",
   "matching_features": ["up to 5 short strings"],
@@ -606,8 +611,19 @@ Return ONLY a JSON object with exactly these keys:
     except Exception:
         confidence = 50
 
+    # Keep the numeric score consistent with the verdict band (mid-band if missing/invalid)
+    bands = {"strong_match": (85, 100), "weak_match": (70, 84), "inconclusive": (50, 69),
+             "verify": (25, 49), "mismatch": (0, 24)}
+    lo, hi = bands[verdict]
+    try:
+        match_score = float(data.get("match_score"))
+    except Exception:
+        match_score = (lo + hi) / 2
+    match_score = int(round(min(hi, max(lo, match_score))))
+
     result = {
         "verdict": verdict,
+        "match_score": match_score,
         "confidence": confidence,
         "summary": str(data.get("summary", "")),
         "matching_features": _as_list(data.get("matching_features")),
@@ -709,11 +725,11 @@ def build_insights(patch_sim_map, final_score, best_global, patch_sim, global_si
     margin = abs(final_score - thr_val)
     if margin < 5:
         out.append(("warn", "🎚️", "Borderline decision",
-                    f"Final score {final_score:.1f}% is only {margin:.1f} pts from the {thr_val:.0f}% line. "
+                    f"CLIP score {final_score:.1f}% is only {margin:.1f} pts from the {thr_val:.0f}% line. "
                     f"Treat the verdict as provisional and prefer human review."))
     else:
         out.append(("ok", "🎚️", "Clear decision margin",
-                    f"Final score {final_score:.1f}% sits {margin:.1f} pts away from the nearest threshold ({thr_val:.0f}%)."))
+                    f"CLIP score {final_score:.1f}% sits {margin:.1f} pts away from the nearest threshold ({thr_val:.0f}%)."))
 
     # 5. Sensitivity what-if
     raw = best_global * 0.6 + patch_sim * 0.4
@@ -822,6 +838,7 @@ with st.sidebar:
     test_augmentations = st.toggle("Test Scale/Rotation", value=True,
                                   help="Check similarity across different sizes and angles")
 
+    clip_weight = 50
     use_gemini = st.toggle("Gemini Vision Findings", value=True,
                            help="Gemini views both images and writes an independent assessment")
     if use_gemini:
@@ -829,6 +846,9 @@ with st.sidebar:
             st.caption(f"✨ {GEMINI_MODEL} · API key detected")
         else:
             st.caption("⚠️ Add GEMINI_API_KEY to Streamlit secrets")
+        clip_weight = st.slider("CLIP weight in final score", 0, 100, 50, 5, format="%d%%",
+                                help="Final score = CLIP score x weight + Gemini score x (100 - weight).")
+        st.caption(f"Weights: CLIP {clip_weight}% · Gemini {100 - clip_weight}%")
 
     st.markdown("---")
 
@@ -1122,57 +1142,89 @@ if uploaded_ref and uploaded_query:
         LVL_RANK = {"green": 2, "amber": 1, "red": 0}
 
         score_color = "#1E8E3E" if final_score > 80 else "#D97706" if final_score > 50 else "#C62828"
-        clip_level = "green" if final_score > 80 else "amber" if final_score > 50 else "red"
+        score_level = lambda sc: "green" if sc > 80 else "amber" if sc > 50 else "red"
+        clip_level = score_level(final_score)
         clip_zone = "match zone" if clip_level == "green" else "review band" if clip_level == "amber" else "low-match zone"
         gem_level = GV_LEVEL[gemini_result["verdict"]] if gemini_result else None
+        gemini_score = float(gemini_result["match_score"]) if gemini_result else None
 
-        # Combined decision: both green -> MATCHED, both red -> MISMATCH, anything else -> REVIEW REQUIRED
         if gem_level is None:
-            decision_basis = "CLIP only"
-            status_text = {"green": "MATCHED", "amber": "REVIEW REQUIRED", "red": "MISMATCH"}[clip_level]
             agreement_label = None
         else:
-            decision_basis = "CLIP + Gemini"
-            if clip_level == gem_level == "green":
-                status_text = "MATCHED"
-            elif clip_level == gem_level == "red":
-                status_text = "MISMATCH"
-            else:
-                status_text = "REVIEW REQUIRED"
             gap = abs(LVL_RANK[clip_level] - LVL_RANK[gem_level])
             agreement_label = "Agree" if gap == 0 else "Partial" if gap == 1 else "Conflict"
 
-        dec_color = {"MATCHED": "#1E8E3E", "REVIEW REQUIRED": "#D97706", "MISMATCH": "#C62828"}[status_text]
-        dec_icon = {"MATCHED": "✅", "REVIEW REQUIRED": "⚠️", "MISMATCH": "❌"}[status_text]
+        # Large numeric disagreement between the two engines is worth surfacing as an insight
+        if gemini_result and abs(final_score - gemini_score) > 25:
+            insights.append(("warn", "⚖️", "Large CLIP vs Gemini score gap",
+                             f"CLIP scored {final_score:.0f}% while Gemini scored {gemini_score:.0f}/100 - a {abs(final_score - gemini_score):.0f}-pt gap. "
+                             f"The engines see the samples very differently; check the reasoning on both sides."))
 
-        if gem_level is None:
-            decision_lean = f"Based on the CLIP pattern engine only ({clip_zone})."
-        elif status_text == "MATCHED":
-            decision_lean = ("Both engines agree the samples match." if gemini_result["verdict"] == "strong_match"
-                             else "Both engines lean towards a match; Gemini rates it a weak match, so confidence is moderate.")
-        elif status_text == "MISMATCH":
-            decision_lean = "Both engines agree the samples do not match."
-        elif {clip_level, gem_level} == {"green", "red"}:
-            decision_lean = "The engines conflict - one sees a match, the other a mismatch."
-        elif "green" in (clip_level, gem_level):
-            decision_lean = "Leaning towards a match, but one engine is not fully convinced."
-        elif "red" in (clip_level, gem_level):
-            decision_lean = "Leaning towards a mismatch, but one engine is not conclusive."
-        else:
-            decision_lean = "Neither engine is conclusive."
+        # ----- PRIMARY DECISION: weighted combination of the two scores -----
+        w_clip = clip_weight / 100.0 if gemini_result else 1.0
+        w_gem = 1.0 - w_clip
+        combined_score = final_score * w_clip + (gemini_score * w_gem if gemini_result else 0.0)
+        combined_score = float(min(100, max(0, combined_score)))
+        combined_level = score_level(combined_score)          # >80 matched, 50-80 review, <=50 mismatch
+        combined_color = LVL_COLOR[combined_level]
+        status_text = {"green": "MATCHED", "amber": "REVIEW REQUIRED", "red": "MISMATCH"}[combined_level]
+        dec_color = combined_color
+        dec_icon = {"MATCHED": "✅", "REVIEW REQUIRED": "⚠️", "MISMATCH": "❌"}[status_text]
+        decision_basis = (f"{round(w_clip * 100)}% CLIP + {round(w_gem * 100)}% Gemini" if gemini_result else "CLIP only")
+
+        _band = {"green": "match band (above 80%)", "amber": "review band (50-80%)", "red": "mismatch band (50% or below)"}[combined_level]
+        decision_lean = (f"Weighted final score {combined_score:.1f}% falls in the {_band}." if gemini_result
+                         else f"Based on the CLIP pattern engine only - {combined_score:.1f}% falls in the {_band}.")
+        _nearest = min((80.0, 50.0), key=lambda t: abs(combined_score - t))
+        if abs(combined_score - _nearest) < 5:
+            decision_lean += f" It is close to the {_nearest:.0f}% line, so treat it as provisional."
+        if agreement_label == "Conflict":
+            decision_lean += " The two engines disagree strongly - read the reasoning on both sides."
 
         decision_action = {
-            "MATCHED": "Proceed. The samples are consistent" + (" - Gemini's weak-match rating makes a quick visual check worthwhile."
-                                                                   if gemini_result and gemini_result["verdict"] == "weak_match" else "."),
+            "MATCHED": "Proceed. The weighted evidence supports a match" + (" - a quick visual check is still worthwhile because the engines do not fully agree."
+                                                                           if agreement_label in ("Partial", "Conflict") else "."),
             "REVIEW REQUIRED": "Send to a human reviewer. The evidence is mixed or incomplete, so do not decide on the score alone.",
             "MISMATCH": "Do not accept automatically. Escalate for manual / fraud verification before any action.",
         }[status_text]
+
+        # ===== PREVIOUS RULE-BASED DECISION (kept for reference) =====================================
+        # Both engines green -> MATCHED, both red -> MISMATCH, anything else -> REVIEW REQUIRED.
+        # To remove it from the dashboard set SHOW_RULE_BASED_DECISION = False
+        # (or delete this block + the "PREVIOUS RULE-BASED DECISION" card in the Decision tab).
+        SHOW_RULE_BASED_DECISION = True
+        if gem_level is None:
+            rule_status_text = {"green": "MATCHED", "amber": "REVIEW REQUIRED", "red": "MISMATCH"}[clip_level]
+        elif clip_level == gem_level == "green":
+            rule_status_text = "MATCHED"
+        elif clip_level == gem_level == "red":
+            rule_status_text = "MISMATCH"
+        else:
+            rule_status_text = "REVIEW REQUIRED"
+        rule_color = {"MATCHED": "#1E8E3E", "REVIEW REQUIRED": "#D97706", "MISMATCH": "#C62828"}[rule_status_text]
+        rule_icon = {"MATCHED": "✅", "REVIEW REQUIRED": "⚠️", "MISMATCH": "❌"}[rule_status_text]
+        if gem_level is None:
+            rule_lean = f"Based on the CLIP pattern engine only ({clip_zone})."
+        elif rule_status_text == "MATCHED":
+            rule_lean = ("Both engines agree the samples match." if gemini_result["verdict"] == "strong_match"
+                         else "Both engines lean towards a match; Gemini rates it a weak match, so confidence is moderate.")
+        elif rule_status_text == "MISMATCH":
+            rule_lean = "Both engines agree the samples do not match."
+        elif {clip_level, gem_level} == {"green", "red"}:
+            rule_lean = "The engines conflict - one sees a match, the other a mismatch."
+        elif "green" in (clip_level, gem_level):
+            rule_lean = "Leaning towards a match, but one engine is not fully convinced."
+        elif "red" in (clip_level, gem_level):
+            rule_lean = "Leaning towards a mismatch, but one engine is not conclusive."
+        else:
+            rule_lean = "Neither engine is conclusive."
+        # =============================================================================================
 
         # Save history
         st.session_state.verification_history.append({
             'time': datetime.now().strftime("%H:%M:%S"),
             'type': mode.lower(),
-            'score': float(final_score),
+            'score': float(combined_score),
             'status': status_text
         })
 
@@ -1212,34 +1264,73 @@ if uploaded_ref and uploaded_query:
                 <div style="text-align: center; padding: 18px 0;">
                     <div style="display: inline-block;">
                         <div style="width: 170px; height: 170px; border-radius: 50%;
-                                    background: conic-gradient(from 0deg, {score_color} 0deg, {score_color} {final_score * 3.6}deg, rgba(0,75,141,0.12) {final_score * 3.6}deg);
+                                    background: conic-gradient(from 0deg, {combined_color} 0deg, {combined_color} {combined_score * 3.6}deg, rgba(0,75,141,0.12) {combined_score * 3.6}deg);
                                     padding: 6px; display: flex; align-items: center; justify-content: center;">
                             <div style="width: 158px; height: 158px; border-radius: 50%; background: #ffffff;
                                         display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                                <div style="font-size: 40px; font-weight: 700; color: {score_color}; font-family: 'Space Mono', monospace;">{final_score:.1f}%</div>
-                                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">CLIP PATTERN MATCH</div>
+                                <div style="font-size: 40px; font-weight: 700; color: {combined_color}; font-family: 'Space Mono', monospace;">{combined_score:.1f}%</div>
+                                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">FINAL SCORE</div>
                             </div>
                         </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
             with hero_r:
-                gem_pill = (_pill("Gemini", f"{GV_ICON[gemini_result['verdict']]} {GV_LABEL[gemini_result['verdict']]}", GV_COLOR[gemini_result["verdict"]])
-                            if gemini_result else _pill("Gemini", "not used", "#64748b"))
                 agree_pill = (_pill("Agreement", agreement_label, {"Agree": "#1E8E3E", "Partial": "#D97706", "Conflict": "#C62828"}[agreement_label])
                               if agreement_label else "")
+                gem_pill = (_pill("Gemini", f"{gemini_score:.0f}/100 · {GV_LABEL[gemini_result['verdict']]}", GV_COLOR[gemini_result["verdict"]])
+                            if gemini_result else _pill("Gemini", "not used", "#64748b"))
                 st.markdown(f"""
                 <div style="padding: 22px 26px; border-radius: 16px; background: linear-gradient(135deg, {dec_color}14, #ffffff); border: 1px solid {dec_color}55; margin-top: 8px;">
                     <div style="font-size: 11px; letter-spacing: 1.5px; color: #64748b; font-weight: 700;">FINAL DECISION · {decision_basis.upper()}</div>
                     <div style="font-size: 36px; font-weight: 800; color: {dec_color}; margin: 4px 0 2px 0;">{dec_icon} {status_text}</div>
                     <div style="font-size: 14px; color: #1F2A44; margin-bottom: 14px;">{_html.escape(decision_lean)}</div>
                     <div>
-                        {_pill("CLIP", f"{final_score:.1f}% · {clip_zone}", score_color)}
+                        {_pill("CLIP", f"{final_score:.1f}%", score_color)}
                         {gem_pill}
                         {agree_pill}
                     </div>
                     <div style="margin-top: 6px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.08); font-size: 13px; color: #475569; line-height: 1.55;">
                         <b style="color: #0B2D5B;">Recommended action:</b> {_html.escape(decision_action)}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # ----- score composition -----
+            def _score_card(title, score, sub, color):
+                val, width = ("—", 0) if score is None else (f"{score:.1f}%", max(0, min(100, score)))
+                return (f"""<div style="padding: 16px 18px; background: #ffffff; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; border-top: 4px solid {color};">
+                    <div style="font-size: 11px; letter-spacing: 1px; font-weight: 700; color: #64748b;">{title}</div>
+                    <div style="font-size: 30px; font-weight: 700; color: {color}; font-family: 'Space Mono', monospace;">{val}</div>
+                    <div style="height: 6px; background: rgba(0,0,0,0.08); border-radius: 3px; margin: 8px 0 6px 0; overflow: hidden;"><div style="width: {width}%; height: 100%; background: {color};"></div></div>
+                    <div style="font-size: 12px; color: #64748b;">{sub}</div></div>""")
+
+            st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+            sc1, sc2, sc3 = st.columns(3)
+            with sc1:
+                st.markdown(_score_card("📐 CLIP SCORE", final_score,
+                                        f"weight {w_clip * 100:.0f}% · adds {final_score * w_clip:.1f} pts", score_color), unsafe_allow_html=True)
+            with sc2:
+                if gemini_result:
+                    st.markdown(_score_card("✨ GEMINI SCORE", gemini_score,
+                                            f"weight {w_gem * 100:.0f}% · adds {gemini_score * w_gem:.1f} pts · {GV_LABEL[gemini_result['verdict']].title()}",
+                                            LVL_COLOR[score_level(gemini_score)]), unsafe_allow_html=True)
+                else:
+                    st.markdown(_score_card("✨ GEMINI SCORE", None, "not used in this run", "#64748b"), unsafe_allow_html=True)
+            with sc3:
+                st.markdown(_score_card("🎯 FINAL SCORE", combined_score, decision_basis, combined_color), unsafe_allow_html=True)
+
+            # ----- previous rule-based decision (toggle with SHOW_RULE_BASED_DECISION) -----
+            if SHOW_RULE_BASED_DECISION:
+                _differs = "" if rule_status_text == status_text else " · differs from the score-based decision above"
+                st.markdown(f"""
+                <div style="padding: 14px 18px; border-radius: 12px; background: rgba(0,75,141,0.04); border: 1px dashed {rule_color}; margin: 12px 0 4px 0;">
+                    <div style="font-size: 11px; letter-spacing: 1px; font-weight: 700; color: #64748b;">
+                        PREVIOUS RULE-BASED DECISION · both green = matched, both red = mismatch, otherwise review{_differs}
+                    </div>
+                    <div style="margin-top: 4px;">
+                        <span style="font-size: 20px; font-weight: 800; color: {rule_color};">{rule_icon} {rule_status_text}</span>
+                        <span style="font-size: 13px; color: #475569; margin-left: 10px;">{_html.escape(rule_lean)}</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1252,7 +1343,7 @@ if uploaded_ref and uploaded_query:
             clip_items = [
                 ("#004B8D", f"Global pattern similarity is {best_global:.1f}% (unmodified query: {global_sim:.1f}%)."),
                 ("#004B8D", f"Local patch alignment is {patch_sim:.1f}%, with {n_strong_patches} of 49 patches strongly matched."),
-                (score_color, f"Final score {final_score:.1f}% falls in the {clip_zone} (match above 80%, review 50-80%, low match below 50%)."),
+                (score_color, f"CLIP score {final_score:.1f}% falls in the {clip_zone} (match above 80%, review 50-80%, low match below 50%)."),
             ]
             warn_items = [(("#C62828" if sv == "bad" else "#D97706"), f"{t}: {_short(x, 150)}") for sv, _, t, x in insights if sv in ("warn", "bad")]
             clip_items += warn_items[:3] if warn_items else [("#1E8E3E", "No spatial, stability or image-quality warnings were raised.")]
@@ -1266,7 +1357,7 @@ if uploaded_ref and uploaded_query:
                              + [("#C62828", "Red flag: " + x) for x in g["red_flags"][:2]])
                 gem_body += f'<ul style="list-style:none; padding-left:0; margin:6px 0 0 0;">{_bullets(gem_items)}</ul>'
                 gem_title_color = GV_COLOR[g["verdict"]]
-                gem_title = f'{GV_ICON[g["verdict"]]} Gemini · {GV_LABEL[g["verdict"]]} ({g["confidence"]}% confidence)'
+                gem_title = f'{GV_ICON[g["verdict"]]} Gemini · {g["match_score"]}/100 · {GV_LABEL[g["verdict"]]} ({g["confidence"]}% confidence)'
             else:
                 if not use_gemini:
                     msg = "Gemini review is switched off in the sidebar, so this decision rests on the CLIP engine alone."
@@ -1293,7 +1384,7 @@ if uploaded_ref and uploaded_query:
                 </div>
                 """, unsafe_allow_html=True)
 
-            st.caption("Rule: both engines green = MATCHED · both red = MISMATCH · anything else = REVIEW REQUIRED. This is a screening aid, not forensic proof.")
+            st.caption("Final score = CLIP score x CLIP weight + Gemini score x Gemini weight (set in the sidebar). Above 80% = MATCHED, 50-80% = REVIEW REQUIRED, 50% or below = MISMATCH. This is a screening aid, not forensic proof.")
 
         with tab_metrics:
             # Reasoning chain
@@ -1453,9 +1544,9 @@ if uploaded_ref and uploaded_query:
                         </div>
                     </div>
                     <div style="margin-top: 12px; height: 6px; background: rgba(0,0,0,0.08); border-radius: 3px; overflow: hidden;">
-                        <div style="width: {g['confidence']}%; height: 100%; background: {gv_color}; border-radius: 3px;"></div>
+                        <div style="width: {g['match_score']}%; height: 100%; background: {gv_color}; border-radius: 3px;"></div>
                     </div>
-                    <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Gemini confidence: {g['confidence']}%</div>
+                    <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Gemini match score: <b>{g['match_score']}/100</b> · verdict confidence: {g['confidence']}%</div>
                     <p style="color: #1F2A44; margin: 14px 0 6px 0; line-height: 1.6;">{_html.escape(g['summary'])}</p>
                     <p style="color: #64748b; font-size: 12px; margin: 0;">{ag_text}</p>
                 </div>
@@ -1672,7 +1763,9 @@ if uploaded_ref and uploaded_query:
                 "insights": [{"severity": a, "title": c, "detail": d} for a, _, c, d in insights],
                 "gemini": ({"model": GEMINI_MODEL, **gemini_result} if gemini_result else None),
                 "clip_vs_gemini_agreement": agreement_label,
-                "final_decision": {"status": status_text, "basis": decision_basis, "assessment": decision_lean}
+                "final_decision": {"status": status_text, "combined_score": round(combined_score, 2), "basis": decision_basis,
+                               "weights": {"clip": round(w_clip, 2), "gemini": round(w_gem, 2)}, "assessment": decision_lean},
+            "rule_based_decision": {"status": rule_status_text, "assessment": rule_lean}
             }
 
             json_str = json.dumps(export_data, indent=2, default=str)
