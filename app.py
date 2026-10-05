@@ -423,12 +423,15 @@ def compute_pattern_similarity(ref_bytes, query_bytes, augment=True):
 # ==========================================
 def create_pattern_heatmap(patch_sim_map, ref_display, query_display):
     """Create a pattern-similarity heatmap showing WHICH regions match, not pixel diff."""
-    from scipy.ndimage import zoom
+    from PIL import Image
 
     h, w, _ = ref_display.shape
 
-    # Upsample 7x7 patch similarity map to image size
-    upsampled = zoom(patch_sim_map, (h / 7, w / 7), order=1)
+    # Upsample 7x7 patch similarity map to image size (bilinear, no scipy needed)
+    upsampled = np.array(
+        Image.fromarray(np.asarray(patch_sim_map, dtype=np.float32), mode="F")
+        .resize((w, h), Image.Resampling.BILINEAR)
+    )
     upsampled = np.clip(upsampled, 0, 1)
 
     # Create RGB heatmap using jet colormap (manual)
