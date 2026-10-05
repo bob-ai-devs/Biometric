@@ -525,31 +525,39 @@ def run_gemini_analysis(ref_bytes, query_bytes, mode):
                  "starting/ending strokes. Also watch for signs of tracing, hesitation or tremor.")
 
     if mode == "Fingerprint":
-        strictness = ('Be strict and conservative: fingerprints are highly specific, so differences in pattern class, '
-                      'core/delta structure or minutiae are meaningful. If image quality or partial content makes the '
-                      'evidence insufficient, answer "inconclusive".')
+        strictness = ('Be strict: fingerprints are highly specific, so differences in pattern class, core/delta '
+                      'structure, ridge flow or minutiae are meaningful. Tolerate only rotation, shifts, partial '
+                      'prints and scan-size differences.')
     else:
-        strictness = ('Be tolerant: genuine signatures naturally vary from one signing to the next (size, position, '
-                      'slight slant, speed, pen pressure, small shape differences, ink or scan quality). '
-                      'Do NOT treat minor or cosmetic differences as evidence of forgery - list them only as '
-                      'low-importance notes. Answer "mismatch" only when the fundamental structure or habitual style '
-                      'clearly differs, or there are strong signs of tracing or imitation. Answer "match" when the '
-                      'core style and structure are consistent despite normal variation, and "inconclusive" only '
-                      'when the evidence is genuinely unclear.')
+        strictness = ('Be balanced. Genuine signatures vary between signings, so tolerate differences in size, '
+                      'position, slight slant, speed, pen pressure and scan quality. But do weigh the core '
+                      'identity traits: letterform structure, stroke flow and order, relative proportions between '
+                      'components, and distinctive flourishes, loops or terminal strokes. Do not dismiss '
+                      'consistent structural differences as "natural variation", and do not penalise trivial ones.')
+
+    review_scale = """Think like a careful peer reviewer weighing evidence on both sides, then choose ONE verdict:
+- "strong_match": nearly all core traits are consistent; any differences are cosmetic.
+- "weak_match": broadly similar and leaning match, but one or two notable differences or limited evidence keep it from being strong.
+- "inconclusive": the images do not allow a fair judgement (poor quality, partial sample, very little detail).
+- "verify": several notable differences or concerning signs in core traits; leaning mismatch but not conclusive - needs manual verification.
+- "mismatch": the fundamental structure or style clearly differs, or there are strong signs of tracing/imitation."""
 
     prompt = f"""You are assisting a bank's document-verification reviewer.
 Compare Image 1 (REFERENCE, ground truth) with Image 2 (QUERY, to verify). Both are {mode.lower()} samples.
 Judge from the images alone. Focus on: {focus}
 {strictness}
+
+{review_scale}
+
 Do not claim legal or forensic certainty - this is a screening aid for a human reviewer.
 
 Return ONLY a JSON object with exactly these keys:
 {{
-  "verdict": "match" | "inconclusive" | "mismatch",
+  "verdict": "strong_match" | "weak_match" | "inconclusive" | "verify" | "mismatch",
   "confidence": integer 0-100 (your confidence in the verdict),
-  "summary": "2-3 sentence plain-language explanation",
+  "summary": "2-3 sentence reviewer-style explanation of the decisive evidence",
   "matching_features": ["up to 5 short strings"],
-  "differing_features": ["up to 5 short strings; mark each as (minor) or (significant)"],
+  "differing_features": ["up to 5 short strings; mark each as (minor), (moderate) or (significant)"],
   "red_flags": ["short strings; empty list if none"],
   "reference_quality": "one short sentence",
   "query_quality": "one short sentence",
@@ -588,8 +596,10 @@ Return ONLY a JSON object with exactly these keys:
             return [str(x) for x in v][:6]
         return [str(v)] if v else []
 
-    verdict = str(data.get("verdict", "inconclusive")).strip().lower()
-    if verdict not in ("match", "inconclusive", "mismatch"):
+    verdict = str(data.get("verdict", "inconclusive")).strip().lower().replace(" ", "_").replace("-", "_")
+    verdict = {"match": "strong_match", "weak": "weak_match", "strong": "strong_match",
+               "needs_verification": "verify", "verify_manually": "verify"}.get(verdict, verdict)
+    if verdict not in ("strong_match", "weak_match", "inconclusive", "verify", "mismatch"):
         verdict = "inconclusive"
     try:
         confidence = int(max(0, min(100, float(data.get("confidence", 50)))))
@@ -1411,11 +1421,16 @@ if uploaded_ref and uploaded_query:
                     st.warning(f"Gemini analysis unavailable ({gemini_error}). The CLIP results above are unaffected.")
                 else:
                     g = gemini_result
-                    gv_color = {"match": "#1E8E3E", "inconclusive": "#D97706", "mismatch": "#C62828"}[g["verdict"]]
-                    gv_icon = {"match": "✅", "inconclusive": "⚠️", "mismatch": "❌"}[g["verdict"]]
+                    gv_color = {"strong_match": "#1E8E3E", "weak_match": "#6B9A1F", "inconclusive": "#D97706",
+                                "verify": "#F15A22", "mismatch": "#C62828"}[g["verdict"]]
+                    gv_icon = {"strong_match": "✅", "weak_match": "☑️", "inconclusive": "⚠️",
+                               "verify": "🔍", "mismatch": "❌"}[g["verdict"]]
+                    gv_label = {"strong_match": "STRONG MATCH", "weak_match": "WEAK MATCH",
+                                "inconclusive": "INCONCLUSIVE", "verify": "VERIFY MANUALLY",
+                                "mismatch": "MISMATCH"}[g["verdict"]]
 
                     clip_bucket = 2 if final_score > 80 else 1 if final_score > 50 else 0
-                    gem_bucket = {"match": 2, "inconclusive": 1, "mismatch": 0}[g["verdict"]]
+                    gem_bucket = {"strong_match": 2, "weak_match": 1, "inconclusive": 1, "verify": 1, "mismatch": 0}[g["verdict"]]
                     gap = abs(clip_bucket - gem_bucket)
                     agreement_label, ag_color, ag_text = (
                         ("Agree", "#1E8E3E", "CLIP and Gemini reach the same conclusion.") if gap == 0 else
@@ -1431,7 +1446,7 @@ if uploaded_ref and uploaded_query:
                     st.markdown(f"""
                     <div style="padding: 20px; background: rgba(0,75,141,0.04); border-radius: 12px; border: 1px solid rgba(0,0,0,0.08);">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                            <div style="font-size: 22px; font-weight: 700; color: {gv_color};">{gv_icon} Gemini verdict: {g['verdict'].upper()}</div>
+                            <div style="font-size: 22px; font-weight: 700; color: {gv_color};">{gv_icon} Gemini verdict: {gv_label}</div>
                             <div style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: {ag_color}; border: 1px solid {ag_color};">
                                 CLIP vs Gemini: {agreement_label}
                             </div>
