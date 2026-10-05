@@ -468,6 +468,279 @@ def process_image_display(image_bytes, target_size=(400, 400)):
     img = img.resize(target_size, Image.Resampling.LANCZOS)
     return np.array(img)
 
+
+# ==========================================
+# GEMINI VISION (google-genai) + LOCAL INSIGHTS
+# ==========================================
+GEMINI_MODEL = "gemini-flash-lite-latest"
+
+def get_gemini_key():
+    """Read the Gemini key from Streamlit secrets (or env var as fallback)."""
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        try:
+            val = st.secrets.get(name)
+        except Exception:
+            val = None
+        if val:
+            return str(val)
+        val = os.environ.get(name)
+        if val:
+            return val
+    return None
+
+
+def _prepare_for_gemini(image_bytes, max_side=1024):
+    """Convert any upload (incl. BMP/TIFF) to a reasonably sized JPEG for Gemini."""
+    from PIL import Image
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    img.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=90)
+    return buf.getvalue()
+
+
+def run_gemini_analysis(ref_bytes, query_bytes, mode):
+    """Ask Gemini to visually compare both samples. Returns (result_dict, error_str)."""
+    import hashlib
+    import re
+
+    cache = st.session_state.setdefault("gemini_cache", {})
+    cache_key = hashlib.sha256(
+        ref_bytes + b"|" + query_bytes + b"|" + mode.encode() + GEMINI_MODEL.encode()
+    ).hexdigest()
+    if cache_key in cache:
+        return cache[cache_key], None
+
+    api_key = get_gemini_key()
+    if not api_key:
+        return None, "no_key"
+
+    if mode == "Fingerprint":
+        focus = ("ridge pattern class (loop / whorl / arch), core and delta positions, ridge flow direction, "
+                 "ridge density and spacing, and visible minutiae (ridge endings, bifurcations). "
+                 "Allow for rotation, shifts, partial prints and different scan sizes.")
+    else:
+        focus = ("letterforms, stroke style and pressure, slant, proportions, baseline, connecting strokes and "
+                 "ligatures, pen-lift rhythm, and signs of tracing, hesitation or tremor. "
+                 "Allow for natural variation in size and position.")
+
+    prompt = f"""You are assisting a bank's document-verification reviewer.
+Compare Image 1 (REFERENCE, ground truth) with Image 2 (QUERY, to verify). Both are {mode.lower()} samples.
+Judge from the images alone. Focus on: {focus}
+Be conservative: if image quality or partial content makes the evidence insufficient, answer "inconclusive".
+Do not claim legal or forensic certainty - this is a screening aid for a human reviewer.
+
+Return ONLY a JSON object with exactly these keys:
+{{
+  "verdict": "match" | "inconclusive" | "mismatch",
+  "confidence": integer 0-100 (your confidence in the verdict),
+  "summary": "2-3 sentence plain-language explanation",
+  "matching_features": ["up to 5 short strings"],
+  "differing_features": ["up to 5 short strings"],
+  "red_flags": ["short strings; empty list if none"],
+  "reference_quality": "one short sentence",
+  "query_quality": "one short sentence",
+  "recommendation": "one short sentence on what the reviewer should do next"
+}}"""
+
+    try:
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=api_key)
+        resp = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[
+                prompt,
+                "Image 1 - REFERENCE sample:",
+                types.Part.from_bytes(data=_prepare_for_gemini(ref_bytes), mime_type="image/jpeg"),
+                "Image 2 - QUERY sample:",
+                types.Part.from_bytes(data=_prepare_for_gemini(query_bytes), mime_type="image/jpeg"),
+            ],
+            config=types.GenerateContentConfig(
+                temperature=0.2,
+                response_mime_type="application/json",
+            ),
+        )
+        text = (resp.text or "").strip()
+        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
+        data = json.loads(text)
+        if isinstance(data, list) and data:
+            data = data[0]
+    except Exception as e:
+        return None, f"{type(e).__name__}: {str(e)[:200]}"
+
+    def _as_list(v):
+        if isinstance(v, list):
+            return [str(x) for x in v][:6]
+        return [str(v)] if v else []
+
+    verdict = str(data.get("verdict", "inconclusive")).strip().lower()
+    if verdict not in ("match", "inconclusive", "mismatch"):
+        verdict = "inconclusive"
+    try:
+        confidence = int(max(0, min(100, float(data.get("confidence", 50)))))
+    except Exception:
+        confidence = 50
+
+    result = {
+        "verdict": verdict,
+        "confidence": confidence,
+        "summary": str(data.get("summary", "")),
+        "matching_features": _as_list(data.get("matching_features")),
+        "differing_features": _as_list(data.get("differing_features")),
+        "red_flags": _as_list(data.get("red_flags")),
+        "reference_quality": str(data.get("reference_quality", "")),
+        "query_quality": str(data.get("query_quality", "")),
+        "recommendation": str(data.get("recommendation", "")),
+    }
+    cache[cache_key] = result
+    return result, None
+
+
+@st.cache_data(show_spinner=False)
+def compute_quality_metrics(image_bytes):
+    """Cheap, local image-quality heuristics (numpy only)."""
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(image_bytes)).convert("L")
+    width, height = img.size
+    small = img.copy()
+    small.thumbnail((512, 512), Image.Resampling.LANCZOS)  # comparable scale for sharpness
+    g = np.asarray(small, dtype=np.float32)
+
+    lap = (-4 * g[1:-1, 1:-1] + g[:-2, 1:-1] + g[2:, 1:-1] + g[1:-1, :-2] + g[1:-1, 2:])
+    sharpness = float(lap.var())
+    contrast = float(g.std())
+
+    # Otsu threshold -> minority class = ink / ridges
+    hist, _ = np.histogram(g, bins=256, range=(0, 255))
+    hist = hist.astype(np.float64)
+    total = hist.sum()
+    sum_all = np.dot(np.arange(256), hist)
+    w0 = np.cumsum(hist)
+    w1 = total - w0
+    sum0 = np.cumsum(hist * np.arange(256))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        m0 = sum0 / w0
+        m1 = (sum_all - sum0) / w1
+        between = w0 * w1 * (m0 - m1) ** 2
+    thr = int(np.nanargmax(between)) if np.isfinite(between).any() else 128
+    frac_low = float((g <= thr).mean())
+    coverage = min(frac_low, 1 - frac_low)
+
+    return {"width": width, "height": height, "sharpness": sharpness,
+            "contrast": contrast, "coverage": coverage}
+
+
+def build_insights(patch_sim_map, final_score, best_global, patch_sim, global_sim,
+                   multi_scale_sims, aug_records, sensitivity, test_augmentations,
+                   q_ref, q_query):
+    """Derive extra insights from data we already have - no extra model involved.
+    Returns a list of (severity, icon, title, text); severity in ok / warn / bad / info."""
+    out = []
+
+    def verdict_of(sc):
+        return "Authentic" if sc > 80 else "Review" if sc > 50 else "Forgery"
+
+    # 1. Spatial consistency (3x3 regions of the 7x7 patch grid)
+    bands = np.array_split(np.arange(7), 3)
+    region = np.array([[patch_sim_map[np.ix_(rb, cb)].mean() for cb in bands] for rb in bands]) * 100
+    rows, cols = ["top", "middle", "bottom"], ["left", "center", "right"]
+    name = lambda rc: "center" if rc == (1, 1) else f"{rows[rc[0]]}-{cols[rc[1]]}"
+    wi = tuple(int(x) for x in np.unravel_index(np.argmin(region), region.shape))
+    si = tuple(int(x) for x in np.unravel_index(np.argmax(region), region.shape))
+    spread = float(region.max() - region.min())
+    if spread > 15:
+        out.append(("warn", "🧭", "Uneven spatial match",
+                    f"Weakest area of the reference is {name(wi)} ({region[wi]:.0f}%) vs strongest {name(si)} "
+                    f"({region[si]:.0f}%). A {spread:.0f}-pt gap suggests a localised difference worth a manual look."))
+    else:
+        out.append(("ok", "🧭", "Consistent across regions",
+                    f"All nine regions of the reference score within {spread:.0f} pts of each other "
+                    f"(range {region.min():.0f}-{region.max():.0f}%)."))
+
+    # 2. Strong patch coverage
+    n_strong = int((patch_sim_map > 0.7).sum())
+    sev = "ok" if n_strong >= 30 else "warn" if n_strong >= 15 else "bad"
+    out.append((sev, "🧩", "Strongly matched patches",
+                f"{n_strong} of 49 local patches exceed 0.70 similarity ({n_strong / 49 * 100:.0f}% of the sample)."))
+
+    # 3. Stability across scale / rotation
+    if test_augmentations and aug_records:
+        sims = np.array(multi_scale_sims, dtype=float)
+        std = float(sims.std())
+        bs, ba, bsim = max(aug_records, key=lambda r: r[2])
+        best_txt = (f"Best alignment at {bs:.2f}x / {ba:+d} deg ({bsim:.1f}%) vs {global_sim:.1f}% unmodified."
+                    if bsim > global_sim else "The unmodified query already gave the best alignment.")
+        if std < 1.5:
+            out.append(("ok", "🔄", "Stable under scale/rotation",
+                        f"{len(sims)} variants vary by only {std:.1f} pts (std). {best_txt}"))
+        else:
+            out.append(("warn", "🔄", "Sensitive to scale/rotation",
+                        f"{len(sims)} variants vary by {std:.1f} pts (std, range {sims.min():.1f}-{sims.max():.1f}%). "
+                        f"The match depends on alignment. {best_txt}"))
+
+    # 4. Margin to the decision thresholds
+    thr_name, thr_val = min((("Authentic", 80.0), ("Review", 50.0)), key=lambda t: abs(final_score - t[1]))
+    margin = abs(final_score - thr_val)
+    if margin < 5:
+        out.append(("warn", "🎚️", "Borderline decision",
+                    f"Final score {final_score:.1f}% is only {margin:.1f} pts from the {thr_val:.0f}% line. "
+                    f"Treat the verdict as provisional and prefer human review."))
+    else:
+        out.append(("ok", "🎚️", "Clear decision margin",
+                    f"Final score {final_score:.1f}% sits {margin:.1f} pts away from the nearest threshold ({thr_val:.0f}%)."))
+
+    # 5. Sensitivity what-if
+    raw = best_global * 0.6 + patch_sim * 0.4
+    what_if = {sv: verdict_of(min(100, max(0, raw * (0.5 + 0.5 * sv)))) for sv in (0.25, 0.5, 0.75, 1.0)}
+    if len(set(what_if.values())) == 1:
+        out.append(("ok", "🎛️", "Verdict independent of sensitivity",
+                    f"Result stays '{verdict_of(final_score)}' for any sensitivity from 0.25 to 1.00."))
+    else:
+        detail = ", ".join(f"{k:.2f}: {v}" for k, v in what_if.items())
+        out.append(("warn", "🎛️", "Verdict depends on sensitivity", f"Changes with the slider ({detail})."))
+
+    # 6. What the CLIP encoder actually sees (center-crop to square)
+    seen = {}
+    for label, q in (("reference", q_ref), ("query", q_query)):
+        seen[label] = min(q["width"], q["height"]) / max(q["width"], q["height"]) * 100
+    cropped = [f"{k} ({v:.0f}% visible)" for k, v in seen.items() if v < 75]
+    if cropped:
+        out.append(("warn", "✂️", "Wide image gets cropped",
+                    "CLIP centre-crops to a square, so edges are dropped for: " + ", ".join(cropped) +
+                    ". Padding wide signatures to a square before upload keeps the whole sample in view."))
+
+    # 7. Image quality (heuristic)
+    issues, lines = [], []
+    for label, q in (("Reference", q_ref), ("Query", q_query)):
+        lines.append(f"{label}: {q['width']}x{q['height']}px, sharpness {q['sharpness']:.0f}, "
+                     f"contrast {q['contrast']:.0f}, ink/ridge coverage {q['coverage'] * 100:.1f}%")
+        if min(q["width"], q["height"]) < 200:
+            issues.append(f"{label.lower()} is low resolution")
+        if q["sharpness"] < 50:
+            issues.append(f"{label.lower()} looks soft/blurry")
+        if q["contrast"] < 35:
+            issues.append(f"{label.lower()} has low contrast")
+        if q["coverage"] < 0.02:
+            issues.append(f"{label.lower()} shows very little ink/ridge detail")
+    out.append(("warn" if issues else "ok", "🔬", "Image quality (heuristic)",
+                ("Flags: " + "; ".join(issues) + ". " if issues else "No obvious quality problems. ") + " | ".join(lines)))
+
+    # 8. Comparability of the two uploads
+    ar_r = q_ref["width"] / q_ref["height"]
+    ar_q = q_query["width"] / q_query["height"]
+    ratio = max(ar_r, ar_q) / min(ar_r, ar_q)
+    res_ratio = max(q_ref["width"] * q_ref["height"], q_query["width"] * q_query["height"]) / \
+        max(1, min(q_ref["width"] * q_ref["height"], q_query["width"] * q_query["height"]))
+    if ratio > 1.25 or res_ratio > 4:
+        out.append(("info", "📐", "Samples differ in shape or size",
+                    f"Aspect ratios differ by {ratio:.2f}x and pixel counts by {res_ratio:.1f}x. "
+                    f"The engine is scale-tolerant, but very different framing can still lower scores."))
+    return out
+
+
 # Sidebar
 with st.sidebar:
     st.markdown("""
@@ -525,6 +798,14 @@ with st.sidebar:
 
     test_augmentations = st.toggle("Test Scale/Rotation", value=True,
                                   help="Check similarity across different sizes and angles")
+
+    use_gemini = st.toggle("Gemini Vision Findings", value=True,
+                           help="Gemini views both images and writes an independent assessment")
+    if use_gemini:
+        if get_gemini_key():
+            st.caption(f"✨ {GEMINI_MODEL} · API key detected")
+        else:
+            st.caption("⚠️ Add GEMINI_API_KEY to Streamlit secrets")
 
     st.markdown("---")
 
@@ -716,6 +997,7 @@ if uploaded_ref and uploaded_query:
             """, unsafe_allow_html=True)
 
         multi_scale_sims = [global_sim]
+        aug_records = []
 
         if test_augmentations:
             model_data = load_clip_model()
@@ -755,6 +1037,7 @@ if uploaded_ref and uploaded_query:
 
                             aug_sim = float((np.dot(ref_global, aug_embed) + 1) / 2 * 100)
                             multi_scale_sims.append(aug_sim)
+                            aug_records.append((scale, angle, aug_sim))
                         except:
                             continue
 
@@ -1057,6 +1340,132 @@ if uploaded_ref and uploaded_query:
         </div>
         """, unsafe_allow_html=True)
 
+        # ==========================================
+        # SMART INSIGHTS (local, no extra LLM)
+        # ==========================================
+        import html as _html
+
+        insights = build_insights(
+            patch_sim_map, final_score, best_global, patch_sim, global_sim,
+            multi_scale_sims, aug_records, sensitivity, test_augmentations,
+            compute_quality_metrics(ref_bytes), compute_quality_metrics(query_bytes)
+        )
+
+        st.markdown("""
+        <div class="verification-card" style="margin-top: 20px;">
+            <h3 style="color: #F15A22; margin-bottom: 8px;">💡 Smart Insights</h3>
+            <p style="color: #64748b; font-size: 12px; margin-top: -4px;">
+                Derived locally from the analysis above - spatial consistency, stability, decision margin,
+                image quality and input checks. No additional LLM involved.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        sev_color = {"ok": "#1E8E3E", "warn": "#D97706", "bad": "#C62828", "info": "#004B8D"}
+        ic = st.columns(2)
+        for i, (sev, icon, title, text) in enumerate(insights):
+            with ic[i % 2]:
+                st.markdown(f"""
+                <div style="padding: 14px 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 8px 0; border-left: 4px solid {sev_color[sev]};">
+                    <div style="font-size: 13px; font-weight: 700; color: #0B2D5B;">{icon} {_html.escape(title)}</div>
+                    <div style="font-size: 12.5px; color: #475569; margin-top: 4px; line-height: 1.55;">{_html.escape(text)}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # ==========================================
+        # GEMINI VISION FINDINGS
+        # ==========================================
+        gemini_result, gemini_error, agreement_label = None, None, None
+
+        if use_gemini:
+            st.markdown(f"""
+            <div class="verification-card" style="margin-top: 20px;">
+                <h3 style="color: #F15A22; margin-bottom: 8px;">✨ Gemini Vision Findings</h3>
+                <p style="color: #64748b; font-size: 12px; margin-top: -4px;">
+                    <code>{GEMINI_MODEL}</code> looked at both images independently of the CLIP scores.
+                    Treat it as a second opinion, not a ground truth.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if not get_gemini_key():
+                st.info("Gemini key not found. Add `GEMINI_API_KEY` in Streamlit Cloud -> Manage app -> Settings -> Secrets.")
+            else:
+                with st.spinner("Gemini is examining both samples..."):
+                    gemini_result, gemini_error = run_gemini_analysis(ref_bytes, query_bytes, mode)
+
+                if gemini_error:
+                    st.warning(f"Gemini analysis unavailable ({gemini_error}). The CLIP results above are unaffected.")
+                else:
+                    g = gemini_result
+                    gv_color = {"match": "#1E8E3E", "inconclusive": "#D97706", "mismatch": "#C62828"}[g["verdict"]]
+                    gv_icon = {"match": "✅", "inconclusive": "⚠️", "mismatch": "❌"}[g["verdict"]]
+
+                    clip_bucket = 2 if final_score > 80 else 1 if final_score > 50 else 0
+                    gem_bucket = {"match": 2, "inconclusive": 1, "mismatch": 0}[g["verdict"]]
+                    gap = abs(clip_bucket - gem_bucket)
+                    agreement_label, ag_color, ag_text = (
+                        ("Agree", "#1E8E3E", "CLIP and Gemini reach the same conclusion.") if gap == 0 else
+                        ("Partial", "#D97706", "The two assessments differ by one level - review the details.") if gap == 1 else
+                        ("Conflict", "#C62828", "CLIP and Gemini disagree - manual review is strongly advised.")
+                    )
+
+                    def _li(items, color):
+                        if not items:
+                            return "<li style='color:#64748b;'>None noted</li>"
+                        return "".join(f"<li style='color:#475569; margin:4px 0; line-height:1.5;'>{_html.escape(x)}</li>" for x in items)
+
+                    st.markdown(f"""
+                    <div style="padding: 20px; background: rgba(0,75,141,0.04); border-radius: 12px; border: 1px solid rgba(0,0,0,0.08);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <div style="font-size: 22px; font-weight: 700; color: {gv_color};">{gv_icon} Gemini verdict: {g['verdict'].upper()}</div>
+                            <div style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: {ag_color}; border: 1px solid {ag_color};">
+                                CLIP vs Gemini: {agreement_label}
+                            </div>
+                        </div>
+                        <div style="margin-top: 12px; height: 6px; background: rgba(0,0,0,0.08); border-radius: 3px; overflow: hidden;">
+                            <div style="width: {g['confidence']}%; height: 100%; background: {gv_color}; border-radius: 3px;"></div>
+                        </div>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Gemini confidence: {g['confidence']}%</div>
+                        <p style="color: #1F2A44; margin: 14px 0 6px 0; line-height: 1.6;">{_html.escape(g['summary'])}</p>
+                        <p style="color: #64748b; font-size: 12px; margin: 0;">{ag_text}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    gc1, gc2 = st.columns(2)
+                    with gc1:
+                        st.markdown(f"""
+                        <div style="padding: 14px 16px; background: rgba(30,142,62,0.06); border-radius: 12px; margin: 10px 0; border-left: 4px solid #1E8E3E;">
+                            <div style="font-size: 13px; font-weight: 700; color: #1E8E3E;">Matching features</div>
+                            <ul style="margin: 8px 0 0 0; padding-left: 18px;">{_li(g['matching_features'], '#1E8E3E')}</ul>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with gc2:
+                        st.markdown(f"""
+                        <div style="padding: 14px 16px; background: rgba(217,119,6,0.06); border-radius: 12px; margin: 10px 0; border-left: 4px solid #D97706;">
+                            <div style="font-size: 13px; font-weight: 700; color: #D97706;">Differing features</div>
+                            <ul style="margin: 8px 0 0 0; padding-left: 18px;">{_li(g['differing_features'], '#D97706')}</ul>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    if g["red_flags"]:
+                        st.markdown(f"""
+                        <div style="padding: 14px 16px; background: rgba(198,40,40,0.06); border-radius: 12px; margin: 10px 0; border-left: 4px solid #C62828;">
+                            <div style="font-size: 13px; font-weight: 700; color: #C62828;">🚩 Red flags</div>
+                            <ul style="margin: 8px 0 0 0; padding-left: 18px;">{_li(g['red_flags'], '#C62828')}</ul>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    st.markdown(f"""
+                    <div style="padding: 14px 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 10px 0; border-left: 4px solid #004B8D;">
+                        <div style="font-size: 12.5px; color: #475569; line-height: 1.6;">
+                            <b style="color:#0B2D5B;">Reference quality:</b> {_html.escape(g['reference_quality'])}<br>
+                            <b style="color:#0B2D5B;">Query quality:</b> {_html.escape(g['query_quality'])}<br>
+                            <b style="color:#0B2D5B;">Recommendation:</b> {_html.escape(g['recommendation'])}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
         # Save history
         st.session_state.verification_history.append({
             'time': datetime.now().strftime("%H:%M:%S"),
@@ -1092,7 +1501,10 @@ if uploaded_ref and uploaded_query:
             "settings": {
                 "sensitivity": float(sensitivity),
                 "tested_augmentations": bool(test_augmentations)
-            }
+            },
+            "insights": [{"severity": a, "title": c, "detail": d} for a, _, c, d in insights],
+            "gemini": ({"model": GEMINI_MODEL, **gemini_result} if gemini_result else None),
+            "clip_vs_gemini_agreement": agreement_label
         }
 
         json_str = json.dumps(export_data, indent=2, default=str)
