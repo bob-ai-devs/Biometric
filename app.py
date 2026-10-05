@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import os
 import io
+from zoneinfo import ZoneInfo
 
 # Set page configuration
 st.set_page_config(
@@ -1231,7 +1232,7 @@ if uploaded_ref and uploaded_query:
 
         # Save history
         st.session_state.verification_history.append({
-            'time': datetime.now().strftime("%H:%M:%S"),
+            'time': datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%H:%M:%S"),
             'type': mode.lower(),
             'score': float(combined_score),
             'status': status_text
@@ -1749,7 +1750,7 @@ if uploaded_ref and uploaded_query:
             """, unsafe_allow_html=True)
 
             export_data = {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(),
                 "mode": mode,
                 "model": "openai/clip-vit-base-patch32",
                 "analysis_type": "pattern_based",
@@ -1781,7 +1782,7 @@ if uploaded_ref and uploaded_query:
             st.download_button(
                 label="📥 Download JSON Report",
                 data=json_str,
-                file_name=f"biometric_pattern_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                file_name=f"biometric_pattern_report_{datetime.now(ZoneInfo("Asia/Kolkata")).strftime('%Y%m%d_%H%M%S')}.json",
                 mime="application/json",
                 on_click="ignore"
             )
