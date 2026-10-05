@@ -1,4 +1,3 @@
-
 import streamlit as st
 import numpy as np
 import time
@@ -22,41 +21,41 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Space+Mono:wght@400;700&display=swap');
 
     :root {
-        --primary: #00f5d4;
-        --secondary: #ff006e;
-        --accent: #fb5607;
-        --dark: #0a0e27;
-        --card-bg: rgba(15, 23, 42, 0.8);
+        --primary: #F15A22;
+        --secondary: #004B8D;
+        --accent: #D97706;
+        --dark: #0B2D5B;
+        --card-bg: #FFFFFF;
     }
 
     .main {
-        background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f172a 100%);
+        background: linear-gradient(135deg, #FFF6EF 0%, #FFFFFF 50%, #EAF2FA 100%);
         font-family: 'Inter', sans-serif;
     }
 
     .stApp {
-        background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f172a 100%);
+        background: linear-gradient(135deg, #FFF6EF 0%, #FFFFFF 50%, #EAF2FA 100%);
     }
 
     h1, h2, h3 {
         font-family: 'Inter', sans-serif;
-        color: #ffffff;
+        color: #0B2D5B;
     }
 
     .verification-card {
         background: var(--card-bg);
-        border: 1px solid rgba(0, 245, 212, 0.2);
+        border: 1px solid rgba(241, 90, 34, 0.2);
         border-radius: 16px;
         padding: 24px;
         margin: 12px 0;
         backdrop-filter: blur(10px);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 6px 24px rgba(0, 75, 141, 0.10);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
 
     .verification-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 12px 40px rgba(0, 245, 212, 0.1);
+        box-shadow: 0 10px 32px rgba(241, 90, 34, 0.18);
     }
 
     .feature-tag {
@@ -66,14 +65,14 @@ st.markdown("""
         font-size: 12px;
         font-weight: 600;
         margin: 4px;
-        background: rgba(0, 245, 212, 0.1);
-        border: 1px solid rgba(0, 245, 212, 0.3);
-        color: #00f5d4;
+        background: rgba(241, 90, 34, 0.1);
+        border: 1px solid rgba(241, 90, 34, 0.3);
+        color: #F15A22;
     }
 
     .scan-line {
         height: 2px;
-        background: linear-gradient(90deg, transparent, #00f5d4, transparent);
+        background: linear-gradient(90deg, transparent, #F15A22, transparent);
         animation: scan 2s linear infinite;
     }
 
@@ -83,8 +82,8 @@ st.markdown("""
     }
 
     .stButton>button {
-        background: linear-gradient(135deg, #00f5d4 0%, #00bbf9 100%);
-        color: #0a0e27;
+        background: linear-gradient(135deg, #F15A22 0%, #F7843B 100%);
+        color: #ffffff;
         border: none;
         border-radius: 12px;
         padding: 12px 24px;
@@ -95,7 +94,7 @@ st.markdown("""
 
     .stButton>button:hover {
         transform: scale(1.05);
-        box-shadow: 0 0 20px rgba(0, 245, 212, 0.4);
+        box-shadow: 0 0 20px rgba(241, 90, 34, 0.35);
     }
 
     .llm-badge {
@@ -104,18 +103,18 @@ st.markdown("""
         border-radius: 12px;
         font-size: 10px;
         font-weight: 700;
-        background: rgba(131, 56, 236, 0.2);
-        border: 1px solid rgba(131, 56, 236, 0.4);
-        color: #c084fc;
+        background: rgba(0, 75, 141, 0.2);
+        border: 1px solid rgba(0, 75, 141, 0.4);
+        color: #004B8D;
         font-family: 'Space Mono', monospace;
     }
 
     .model-active {
         padding: 8px 12px;
-        background: rgba(0, 245, 212, 0.08);
+        background: rgba(241, 90, 34, 0.08);
         border-radius: 8px;
         margin: 4px 0;
-        border: 1px solid rgba(0, 245, 212, 0.3);
+        border: 1px solid rgba(241, 90, 34, 0.3);
     }
 
     .ensemble-badge {
@@ -124,9 +123,9 @@ st.markdown("""
         border-radius: 12px;
         font-size: 11px;
         font-weight: 700;
-        background: linear-gradient(135deg, rgba(0, 245, 212, 0.15), rgba(131, 56, 236, 0.15));
-        border: 1px solid rgba(0, 245, 212, 0.3);
-        color: #00f5d4;
+        background: linear-gradient(135deg, rgba(241, 90, 34, 0.15), rgba(0, 75, 141, 0.15));
+        border: 1px solid rgba(241, 90, 34, 0.3);
+        color: #F15A22;
     }
 
     .fast-badge {
@@ -135,9 +134,9 @@ st.markdown("""
         border-radius: 6px;
         font-size: 9px;
         font-weight: 700;
-        background: rgba(0, 245, 212, 0.15);
-        border: 1px solid rgba(0, 245, 212, 0.4);
-        color: #00f5d4;
+        background: rgba(241, 90, 34, 0.15);
+        border: 1px solid rgba(241, 90, 34, 0.35);
+        color: #F15A22;
     }
 
     .status-indicator {
@@ -145,25 +144,25 @@ st.markdown("""
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: #00f5d4;
-        box-shadow: 0 0 8px #00f5d4;
+        background: #F15A22;
+        box-shadow: 0 0 8px #F15A22;
         animation: pulse 2s infinite;
     }
 
     @keyframes pulse {
-        0% { opacity: 1; box-shadow: 0 0 8px #00f5d4; }
-        50% { opacity: 0.5; box-shadow: 0 0 16px #00f5d4; }
-        100% { opacity: 1; box-shadow: 0 0 8px #00f5d4; }
+        0% { opacity: 1; box-shadow: 0 0 8px #F15A22; }
+        50% { opacity: 0.5; box-shadow: 0 0 16px #F15A22; }
+        100% { opacity: 1; box-shadow: 0 0 8px #F15A22; }
     }
 
     .thinking-box {
-        background: rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(0, 245, 212, 0.15);
+        background: #FFF4EC;
+        border: 1px solid rgba(241, 90, 34, 0.25);
         border-radius: 8px;
         padding: 12px 16px;
         font-family: 'Space Mono', monospace;
         font-size: 12px;
-        color: #94a3b8;
+        color: #475569;
         line-height: 1.6;
     }
 
@@ -171,7 +170,7 @@ st.markdown("""
         display: inline-block;
         width: 8px;
         height: 15px;
-        background: #00f5d4;
+        background: #F15A22;
         animation: blink 1s infinite;
         vertical-align: middle;
         margin-left: 2px;
@@ -184,26 +183,39 @@ st.markdown("""
 
     .grid-bg {
         background-image: 
-            linear-gradient(rgba(0, 245, 212, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 245, 212, 0.03) 1px, transparent 1px);
+            linear-gradient(rgba(241, 90, 34, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(241, 90, 34, 0.03) 1px, transparent 1px);
         background-size: 40px 40px;
     }
 
     .pattern-match {
         padding: 8px 12px;
-        background: rgba(0, 245, 212, 0.05);
+        background: rgba(241, 90, 34, 0.05);
         border-radius: 8px;
         margin: 4px 0;
-        border-left: 3px solid #00f5d4;
+        border-left: 3px solid #F15A22;
     }
 
     .pattern-mismatch {
         padding: 8px 12px;
-        background: rgba(255, 0, 110, 0.05);
+        background: rgba(198, 40, 40, 0.05);
         border-radius: 8px;
         margin: 4px 0;
-        border-left: 3px solid #ff006e;
+        border-left: 3px solid #C62828;
     }
+
+    /* ---- Bank of Baroda light-mode chrome ---- */
+    .stApp, .stApp p, .stApp label, .stApp li { color: #1F2A44; }
+    [data-testid="stSidebar"] {
+        background: #FFFFFF;
+        border-right: 3px solid #F15A22;
+    }
+    [data-testid="stHeader"] { background: transparent; }
+    [data-testid="stFileUploaderDropzone"] {
+        background: #FFF9F5;
+        border: 1.5px dashed #F15A22;
+    }
+    .stButton>button:hover { color: #ffffff; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -216,10 +228,10 @@ if 'current_mode' not in st.session_state:
 # Title and Header
 st.markdown("""
 <div style="text-align: center; padding: 20px 0;">
-    <h1 style="font-size: 3.5rem; font-weight: 700; background: linear-gradient(135deg, #00f5d4, #00bbf9, #ff006e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px;">
+    <h1 style="font-size: 3.5rem; font-weight: 700; background: linear-gradient(135deg, #F15A22, #0B2D5B); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px;">
         🔐 BioMetric Verify Pro
     </h1>
-    <p style="color: #94a3b8; font-size: 1.1rem; font-family: 'Space Mono', monospace;">
+    <p style="color: #475569; font-size: 1.1rem; font-family: 'Space Mono', monospace;">
         Pattern-Based LLM Analysis | Position & Scale Invariant
     </p>
     <div class="scan-line" style="margin: 20px 0;"></div>
@@ -249,6 +261,26 @@ def load_clip_model():
         st.error(f"CLIP load failed: {str(e)}")
         return None
 
+
+def get_image_embedding(model, inputs):
+    """Return a plain [batch, proj_dim] tensor from CLIP across transformers versions.
+    Newer transformers return an output object instead of a tensor."""
+    import torch
+    out = model.get_image_features(**inputs)
+    if isinstance(out, torch.Tensor):
+        return out
+    t = None
+    for attr in ("image_embeds", "pooler_output"):
+        t = getattr(out, attr, None)
+        if t is not None:
+            break
+    if t is None:
+        t = out[0]
+    # If we got the pre-projection vector (768), project it to the CLIP space (512)
+    if t.shape[-1] != model.config.projection_dim:
+        t = model.visual_projection(t)
+    return t
+
 # ==========================================
 # CACHED PATTERN-BASED ANALYSIS
 # ==========================================
@@ -275,7 +307,7 @@ def analyze_patterns(image_bytes, model_name="openai/clip-vit-base-patch32"):
         inputs = {k: v.to(device) for k, v in inputs.items()}
 
     with torch.no_grad():
-        global_embed = model.get_image_features(**inputs)
+        global_embed = get_image_embedding(model, inputs)
         global_embed = F.normalize(global_embed, dim=-1).cpu().numpy()[0]
 
     # Patch embeddings (local pattern features) — position independent
@@ -359,7 +391,7 @@ def compute_pattern_similarity(ref_bytes, query_bytes, augment=True):
                         inputs = {k: v.to(device) for k, v in inputs.items()}
 
                     with torch.no_grad():
-                        aug_embed = model.get_image_features(**inputs)
+                        aug_embed = get_image_embedding(model, inputs)
                         aug_embed = F.normalize(aug_embed, dim=-1).cpu().numpy()[0]
 
                     aug_sim = float((np.dot(ref_global, aug_embed) + 1) / 2 * 100)
@@ -438,7 +470,7 @@ with st.sidebar:
     st.markdown("""
     <div style="text-align: center; padding: 20px 0;">
         <div style="font-size: 3rem; margin-bottom: 10px;">🎯</div>
-        <h3 style="color: #00f5d4; margin-bottom: 4px;">Control Panel</h3>
+        <h3 style="color: #F15A22; margin-bottom: 4px;">Control Panel</h3>
         <p style="color: #64748b; font-size: 12px;">v4.0.0 | Pattern-Based Engine</p>
     </div>
     """, unsafe_allow_html=True)
@@ -461,7 +493,7 @@ with st.sidebar:
     st.markdown("""
     <div class="model-active">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 13px; color: #e2e8f0; font-weight: 600;">🎨 CLIP ViT-B/32</span>
+            <span style="font-size: 13px; color: #1F2A44; font-weight: 600;">🎨 CLIP ViT-B/32</span>
             <span class="fast-badge">171MB</span>
         </div>
         <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Pattern-based visual understanding</div>
@@ -496,9 +528,9 @@ with st.sidebar:
     if st.session_state.verification_history:
         st.subheader("📜 Recent Scans")
         for entry in st.session_state.verification_history[-5:]:
-            status_color = "#00f5d4" if entry['score'] > 80 else "#fb5607" if entry['score'] > 50 else "#ff006e"
+            status_color = "#1E8E3E" if entry['score'] > 80 else "#D97706" if entry['score'] > 50 else "#C62828"
             st.markdown(f"""
-            <div style="padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.05); margin: 4px 0; border-left: 3px solid {status_color};">
+            <div style="padding: 8px; border-radius: 8px; background: rgba(0,75,141,0.05); margin: 4px 0; border-left: 3px solid {status_color};">
                 <div style="font-size: 11px; color: #64748b;">{entry['time']}</div>
                 <div style="font-size: 13px; font-weight: 600;">{entry['type'].title()}: <span style="color: {status_color}">{entry['score']:.1f}%</span></div>
             </div>
@@ -509,7 +541,7 @@ st.markdown('<div class="grid-bg">', unsafe_allow_html=True)
 
 st.markdown("""
 <div class="verification-card">
-    <h3 style="color: #00f5d4; margin-bottom: 16px;">📤 Upload Biometric Samples</h3>
+    <h3 style="color: #F15A22; margin-bottom: 16px;">📤 Upload Biometric Samples</h3>
     <p style="color: #64748b; font-size: 13px; margin-top: -8px;">
         Works even if signatures are different sizes or fingerprints are slightly shifted/rotated.
         Analysis is <b>pattern-based</b>, not pixel-perfect.
@@ -522,7 +554,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.markdown("""
     <div style="text-align: center; margin-bottom: 8px;">
-        <span style="color: #00f5d4; font-weight: 600;">🎯 Reference Sample</span>
+        <span style="color: #F15A22; font-weight: 600;">🎯 Reference Sample</span>
         <span style="color: #64748b; font-size: 12px;"> (Ground Truth)</span>
     </div>
     """, unsafe_allow_html=True)
@@ -531,7 +563,7 @@ with col1:
 with col2:
     st.markdown("""
     <div style="text-align: center; margin-bottom: 8px;">
-        <span style="color: #ff006e; font-weight: 600;">🔍 Query Sample</span>
+        <span style="color: #004B8D; font-weight: 600;">🔍 Query Sample</span>
         <span style="color: #64748b; font-size: 12px;"> (To Verify)</span>
     </div>
     """, unsafe_allow_html=True)
@@ -546,7 +578,7 @@ if uploaded_ref and uploaded_query:
 
     st.markdown("""
     <div class="verification-card" style="margin-top: 20px;">
-        <h3 style="color: #00f5d4; margin-bottom: 16px;">🖼️ Sample Preview</h3>
+        <h3 style="color: #F15A22; margin-bottom: 16px;">🖼️ Sample Preview</h3>
     </div>
     """, unsafe_allow_html=True)
 
@@ -575,7 +607,7 @@ if uploaded_ref and uploaded_query:
             st.markdown("""
             <div class="verification-card" style="text-align: center;">
                 <div style="font-size: 3rem; margin-bottom: 16px;">🎯</div>
-                <h3 style="color: #00f5d4;">Loading CLIP Pattern Engine...</h3>
+                <h3 style="color: #F15A22;">Loading CLIP Pattern Engine...</h3>
                 <p style="color: #64748b; font-family: 'Space Mono', monospace;">171MB | Position & Scale Invariant</p>
             </div>
             """, unsafe_allow_html=True)
@@ -591,7 +623,7 @@ if uploaded_ref and uploaded_query:
         with step_ph.container():
             st.markdown("""
             <div class="verification-card">
-                <h4 style="color: #c084fc;">🧠 Phase 1: Pattern Feature Extraction</h4>
+                <h4 style="color: #004B8D;">🧠 Phase 1: Pattern Feature Extraction</h4>
                 <div class="thinking-box">
                     Extracting global and local pattern embeddings from both samples...<span class="cursor"></span>
                 </div>
@@ -612,7 +644,7 @@ if uploaded_ref and uploaded_query:
         with step_ph.container():
             st.markdown(f"""
             <div class="verification-card">
-                <h4 style="color: #c084fc;">🧠 Phase 1: Pattern Feature Extraction <span class="status-indicator"></span></h4>
+                <h4 style="color: #004B8D;">🧠 Phase 1: Pattern Feature Extraction <span class="status-indicator"></span></h4>
                 <div class="thinking-box">
                     ✓ Global pattern embedding extracted<br>
                     ✓ 49 local patch embeddings extracted (7×7 grid)<br>
@@ -629,7 +661,7 @@ if uploaded_ref and uploaded_query:
         with step_ph.container():
             st.markdown("""
             <div class="verification-box">
-                <h4 style="color: #c084fc;">🧠 Phase 2: Local Pattern Matching</h4>
+                <h4 style="color: #004B8D;">🧠 Phase 2: Local Pattern Matching</h4>
                 <div class="thinking-box">
                     Matching local patterns across spatial grid (position-independent)...<span class="cursor"></span>
                 </div>
@@ -656,7 +688,7 @@ if uploaded_ref and uploaded_query:
         with step_ph.container():
             st.markdown(f"""
             <div class="verification-card">
-                <h4 style="color: #c084fc;">🧠 Phase 2: Local Pattern Matching <span class="status-indicator"></span></h4>
+                <h4 style="color: #004B8D;">🧠 Phase 2: Local Pattern Matching <span class="status-indicator"></span></h4>
                 <div class="thinking-box">
                     ✓ 49 patch pairs analyzed (soft matching, position-independent)<br>
                     Local pattern alignment: {patch_sim:.1f}%<br>
@@ -673,7 +705,7 @@ if uploaded_ref and uploaded_query:
         with step_ph.container():
             st.markdown("""
             <div class="verification-card">
-                <h4 style="color: #c084fc;">🧠 Phase 3: Scale & Rotation Robustness</h4>
+                <h4 style="color: #004B8D;">🧠 Phase 3: Scale & Rotation Robustness</h4>
                 <div class="thinking-box">
                     Testing pattern similarity across different scales and angles...<span class="cursor"></span>
                 </div>
@@ -715,7 +747,7 @@ if uploaded_ref and uploaded_query:
                                 inputs = {k: v.to(device) for k, v in inputs.items()}
 
                             with torch.no_grad():
-                                aug_embed = model.get_image_features(**inputs)
+                                aug_embed = get_image_embedding(model, inputs)
                                 aug_embed = F.normalize(aug_embed, dim=-1).cpu().numpy()[0]
 
                             aug_sim = float((np.dot(ref_global, aug_embed) + 1) / 2 * 100)
@@ -729,7 +761,7 @@ if uploaded_ref and uploaded_query:
         with step_ph.container():
             st.markdown(f"""
             <div class="verification-card">
-                <h4 style="color: #c084fc;">🧠 Phase 3: Scale & Rotation Robustness <span class="status-indicator"></span></h4>
+                <h4 style="color: #004B8D;">🧠 Phase 3: Scale & Rotation Robustness <span class="status-indicator"></span></h4>
                 <div class="thinking-box">
                     ✓ Tested {len(multi_scale_sims)} variants (scales: 0.85x–1.15x, rotations: -8° to +8°)<br>
                     Best pattern match: {best_global:.1f}%<br>
@@ -759,11 +791,11 @@ if uploaded_ref and uploaded_query:
         # Results
         st.markdown("""
         <div class="verification-card" style="margin-top: 20px;">
-            <h2 style="text-align: center; color: #00f5d4; margin-bottom: 24px;">📊 Pattern-Based Analysis Results</h2>
+            <h2 style="text-align: center; color: #F15A22; margin-bottom: 24px;">📊 Pattern-Based Analysis Results</h2>
         </div>
         """, unsafe_allow_html=True)
 
-        score_color = "#00f5d4" if final_score > 80 else "#fb5607" if final_score > 50 else "#ff006e"
+        score_color = "#1E8E3E" if final_score > 80 else "#D97706" if final_score > 50 else "#C62828"
         status_text = "AUTHENTIC" if final_score > 80 else "REVIEW REQUIRED" if final_score > 50 else "LIKELY FORGERY"
         status_icon = "✅" if final_score > 80 else "⚠️" if final_score > 50 else "❌"
 
@@ -771,9 +803,9 @@ if uploaded_ref and uploaded_query:
         <div style="text-align: center; padding: 30px;">
             <div style="display: inline-block; position: relative;">
                 <div style="width: 180px; height: 180px; border-radius: 50%; 
-                            background: conic-gradient(from 0deg, {score_color} 0deg, {score_color} {final_score * 3.6}deg, rgba(255,255,255,0.1) {final_score * 3.6}deg);
+                            background: conic-gradient(from 0deg, {score_color} 0deg, {score_color} {final_score * 3.6}deg, rgba(0,75,141,0.12) {final_score * 3.6}deg);
                             padding: 6px; display: flex; align-items: center; justify-content: center;">
-                    <div style="width: 168px; height: 168px; border-radius: 50%; background: #0a0e27; 
+                    <div style="width: 168px; height: 168px; border-radius: 50%; background: #ffffff; 
                                 display: flex; flex-direction: column; align-items: center; justify-content: center;">
                         <div style="font-size: 48px; font-weight: 700; color: {score_color}; font-family: 'Space Mono', monospace;">
                             {final_score:.1f}%
@@ -795,22 +827,22 @@ if uploaded_ref and uploaded_query:
         if show_reasoning and analysis_steps:
             st.markdown("""
             <div class="verification-card" style="margin-top: 20px;">
-                <h3 style="color: #c084fc; margin-bottom: 16px;">🧠 Pattern Analysis Chain</h3>
+                <h3 style="color: #004B8D; margin-bottom: 16px;">🧠 Pattern Analysis Chain</h3>
             </div>
             """, unsafe_allow_html=True)
 
             for i, step in enumerate(analysis_steps):
                 st.markdown(f"""
-                <div style="padding: 12px 16px; background: rgba(131, 56, 236, 0.05); border-radius: 8px; margin: 8px 0; border-left: 3px solid #c084fc;">
-                    <div style="font-size: 11px; color: #c084fc; font-weight: 700; margin-bottom: 4px;">STEP {i+1}</div>
-                    <div style="font-size: 13px; color: #e2e8f0; line-height: 1.5;">{step}</div>
+                <div style="padding: 12px 16px; background: rgba(0, 75, 141, 0.05); border-radius: 8px; margin: 8px 0; border-left: 3px solid #004B8D;">
+                    <div style="font-size: 11px; color: #004B8D; font-weight: 700; margin-bottom: 4px;">STEP {i+1}</div>
+                    <div style="font-size: 13px; color: #1F2A44; line-height: 1.5;">{step}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
         # Metrics
         st.markdown("""
         <div class="verification-card">
-            <h3 style="color: #00f5d4; margin-bottom: 16px;">🔬 Pattern Metrics</h3>
+            <h3 style="color: #F15A22; margin-bottom: 16px;">🔬 Pattern Metrics</h3>
         </div>
         """, unsafe_allow_html=True)
 
@@ -824,13 +856,13 @@ if uploaded_ref and uploaded_query:
 
         for col, (name, score, desc) in zip(mc, metrics):
             with col:
-                bc = "#00f5d4" if score > 80 else "#fb5607" if score > 50 else "#ff006e"
+                bc = "#1E8E3E" if score > 80 else "#D97706" if score > 50 else "#C62828"
                 st.markdown(f"""
-                <div style="text-align: center; padding: 16px; background: rgba(255,255,255,0.03); border-radius: 12px; margin: 8px 0;">
+                <div style="text-align: center; padding: 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 8px 0;">
                     <div style="font-size: 28px; font-weight: 700; color: {bc}; font-family: 'Space Mono', monospace;">{score:.1f}%</div>
-                    <div style="font-size: 13px; font-weight: 600; color: #e2e8f0; margin-top: 8px;">{name}</div>
+                    <div style="font-size: 13px; font-weight: 600; color: #1F2A44; margin-top: 8px;">{name}</div>
                     <div style="font-size: 11px; color: #64748b; margin-top: 4px;">{desc}</div>
-                    <div style="margin-top: 12px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                    <div style="margin-top: 12px; height: 6px; background: rgba(0,0,0,0.08); border-radius: 3px; overflow: hidden;">
                         <div style="width: {score:.1f}%; height: 100%; background: {bc}; border-radius: 3px;"></div>
                     </div>
                 </div>
@@ -840,7 +872,7 @@ if uploaded_ref and uploaded_query:
         if show_heatmap:
             st.markdown("""
             <div class="verification-card" style="margin-top: 20px;">
-                <h3 style="color: #00f5d4; margin-bottom: 16px;">🎨 Pattern Match Heatmap</h3>
+                <h3 style="color: #F15A22; margin-bottom: 16px;">🎨 Pattern Match Heatmap</h3>
                 <p style="color: #64748b; font-size: 12px; margin-top: -8px;">
                     Shows <b>which pattern regions match</b> (not pixel differences). 
                     Green = similar patterns, Red = different patterns. Position-independent.
@@ -850,51 +882,51 @@ if uploaded_ref and uploaded_query:
 
             vc = st.columns(2)
             with vc[0]:
-                st.markdown("<div style='text-align: center; color: #94a3b8; margin-bottom: 8px;'>🔥 Pattern Similarity Map</div>", unsafe_allow_html=True)
+                st.markdown("<div style='text-align: center; color: #475569; margin-bottom: 8px;'>🔥 Pattern Similarity Map</div>", unsafe_allow_html=True)
                 st.image(heatmap, use_container_width=True)
                 st.caption("Patch-level pattern similarity (7×7 CLIP patches upsampled)")
 
             with vc[1]:
-                st.markdown("<div style='text-align: center; color: #94a3b8; margin-bottom: 8px;'>🔍 Overlay on Reference</div>", unsafe_allow_html=True)
+                st.markdown("<div style='text-align: center; color: #475569; margin-bottom: 8px;'>🔍 Overlay on Reference</div>", unsafe_allow_html=True)
                 st.image(overlay, use_container_width=True)
                 st.caption("Pattern match regions overlaid on reference image")
 
         # Feature breakdown
         st.markdown("""
         <div class="verification-card" style="margin-top: 20px;">
-            <h3 style="color: #00f5d4; margin-bottom: 16px;">🧩 Pattern Feature Breakdown</h3>
+            <h3 style="color: #F15A22; margin-bottom: 16px;">🧩 Pattern Feature Breakdown</h3>
         </div>
         """, unsafe_allow_html=True)
 
         if mode == "Fingerprint":
             features = [
-                ("Ridge Pattern Style", float(min(100, final_score * 1.05)), "#00f5d4"),
-                ("Minutiae Distribution", float(min(100, patch_sim * 1.1 + 5)), "#00bbf9"),
-                ("Core/Delta Structure", float(min(100, best_global * 0.95 + 8)), "#ffbe0b"),
-                ("Ridge Flow Direction", float(min(100, patch_sim * 0.9 + 12)), "#fb5607"),
-                ("Pattern Density", float(min(100, final_score * 0.92 + 6)), "#ff006e"),
-                ("Loop/Whirl Type", float(min(100, best_global * 1.0)), "#8338ec")
+                ("Ridge Pattern Style", float(min(100, final_score * 1.05)), "#F15A22"),
+                ("Minutiae Distribution", float(min(100, patch_sim * 1.1 + 5)), "#004B8D"),
+                ("Core/Delta Structure", float(min(100, best_global * 0.95 + 8)), "#F5A100"),
+                ("Ridge Flow Direction", float(min(100, patch_sim * 0.9 + 12)), "#2F80C8"),
+                ("Pattern Density", float(min(100, final_score * 0.92 + 6)), "#C62828"),
+                ("Loop/Whirl Type", float(min(100, best_global * 1.0)), "#0B2D5B")
             ]
         else:
             features = [
-                ("Stroke Style", float(min(100, final_score * 1.05)), "#00f5d4"),
-                ("Pressure Pattern", float(min(100, patch_sim * 1.1 + 5)), "#00bbf9"),
-                ("Curve Signature", float(min(100, best_global * 0.95 + 8)), "#ffbe0b"),
-                ("Pen Lift Rhythm", float(min(100, patch_sim * 0.9 + 12)), "#fb5607"),
-                ("Aspect Proportion", float(min(100, final_score * 0.92 + 6)), "#ff006e"),
-                ("Slant Characteristic", float(min(100, best_global * 1.0)), "#8338ec")
+                ("Stroke Style", float(min(100, final_score * 1.05)), "#F15A22"),
+                ("Pressure Pattern", float(min(100, patch_sim * 1.1 + 5)), "#004B8D"),
+                ("Curve Signature", float(min(100, best_global * 0.95 + 8)), "#F5A100"),
+                ("Pen Lift Rhythm", float(min(100, patch_sim * 0.9 + 12)), "#2F80C8"),
+                ("Aspect Proportion", float(min(100, final_score * 0.92 + 6)), "#C62828"),
+                ("Slant Characteristic", float(min(100, best_global * 1.0)), "#0B2D5B")
             ]
 
         fc = st.columns(3)
         for i, (name, value, color) in enumerate(features):
             with fc[i % 3]:
                 st.markdown(f"""
-                <div style="padding: 16px; background: rgba(255,255,255,0.03); border-radius: 12px; margin: 8px 0; border-left: 4px solid {color};">
+                <div style="padding: 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 8px 0; border-left: 4px solid {color};">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 13px; font-weight: 600; color: #e2e8f0;">{name}</span>
+                        <span style="font-size: 13px; font-weight: 600; color: #1F2A44;">{name}</span>
                         <span style="font-size: 14px; font-weight: 700; color: {color}; font-family: 'Space Mono', monospace;">{value:.1f}%</span>
                     </div>
-                    <div style="margin-top: 8px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;">
+                    <div style="margin-top: 8px; height: 4px; background: rgba(0,0,0,0.08); border-radius: 2px; overflow: hidden;">
                         <div style="width: {value:.1f}%; height: 100%; background: {color}; border-radius: 2px;"></div>
                     </div>
                 </div>
@@ -903,7 +935,7 @@ if uploaded_ref and uploaded_query:
         # Assessment Report
         st.markdown("""
         <div class="verification-card" style="margin-top: 20px;">
-            <h3 style="color: #00f5d4; margin-bottom: 16px;">📝 Pattern-Based Assessment Report</h3>
+            <h3 style="color: #F15A22; margin-bottom: 16px;">📝 Pattern-Based Assessment Report</h3>
         </div>
         """, unsafe_allow_html=True)
 
@@ -982,7 +1014,7 @@ if uploaded_ref and uploaded_query:
 
                 # Headers
                 if line.startswith("**") and line.endswith("**"):
-                    html_lines.append(f"<h4 style='color: #00f5d4; margin: 16px 0 8px 0; font-weight: 700;'>{line[2:-2]}</h4>")
+                    html_lines.append(f"<h4 style='color: #F15A22; margin: 16px 0 8px 0; font-weight: 700;'>{line[2:-2]}</h4>")
                     continue
 
                 # List items
@@ -992,8 +1024,8 @@ if uploaded_ref and uploaded_query:
                         in_list = True
                     item_text = line[1:].strip()
                     # Bold text within list items
-                    item_text = re.sub(r'\*\*(.*?)\*\*', r'<strong style="color: #e2e8f0;"></strong>', item_text)
-                    html_lines.append(f"<li style='color: #94a3b8; margin: 4px 0; line-height: 1.6;'>{item_text}</li>")
+                    item_text = re.sub(r'\*\*(.*?)\*\*', r'<strong style="color: #1F2A44;">\1</strong>', item_text)
+                    html_lines.append(f"<li style='color: #475569; margin: 4px 0; line-height: 1.6;'>{item_text}</li>")
                     continue
                 else:
                     if in_list:
@@ -1001,8 +1033,8 @@ if uploaded_ref and uploaded_query:
                         in_list = False
 
                 # Regular paragraph with bold support
-                line = re.sub(r'\*\*(.*?)\*\*', r'<strong style="color: #e2e8f0;"></strong>', line)
-                html_lines.append(f"<p style='color: #94a3b8; margin: 8px 0; line-height: 1.6;'>{line}</p>")
+                line = re.sub(r'\*\*(.*?)\*\*', r'<strong style="color: #1F2A44;">\1</strong>', line)
+                html_lines.append(f"<p style='color: #475569; margin: 8px 0; line-height: 1.6;'>{line}</p>")
 
             if in_list:
                 html_lines.append("</ul>")
@@ -1012,9 +1044,9 @@ if uploaded_ref and uploaded_query:
         assessment_html = md_to_html(assessment)
 
         st.markdown(f"""
-        <div style="background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255,255,255,0.1);">
+        <div style="background: rgba(0,75,141,0.04); border-radius: 12px; padding: 20px; border: 1px solid rgba(0,0,0,0.08);">
             {assessment_html}
-            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
+            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.08);">
                 <div style="font-size: 11px; color: #64748b; font-family: 'Space Mono', monospace;">
                     Pattern-Based Analysis | CLIP ViT-B/32 | Position & Scale Invariant | Patch-Level
                 </div>
@@ -1033,7 +1065,7 @@ if uploaded_ref and uploaded_query:
         # Export
         st.markdown("""
         <div class="verification-card" style="margin-top: 20px;">
-            <h3 style="color: #00f5d4; margin-bottom: 16px;">💾 Export Results</h3>
+            <h3 style="color: #F15A22; margin-bottom: 16px;">💾 Export Results</h3>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1072,7 +1104,7 @@ else:
     st.markdown("""
     <div class="verification-card" style="text-align: center; padding: 60px 20px; margin-top: 20px;">
         <div style="font-size: 4rem; margin-bottom: 20px;">📂</div>
-        <h3 style="color: #e2e8f0; margin-bottom: 12px;">Ready for Pattern-Based Analysis</h3>
+        <h3 style="color: #1F2A44; margin-bottom: 12px;">Ready for Pattern-Based Analysis</h3>
         <p style="color: #64748b; max-width: 450px; margin: 0 auto; line-height: 1.6;">
             Upload reference and query samples. The system analyzes <b>patterns</b>, not pixels — 
             so different signature sizes, shifted fingerprints, or rotated samples work correctly.
@@ -1088,26 +1120,26 @@ else:
 
     st.markdown("""
     <div class="verification-card" style="margin-top: 20px;">
-        <h3 style="color: #00f5d4; margin-bottom: 16px;">🎯 Pattern-Based Features</h3>
+        <h3 style="color: #F15A22; margin-bottom: 16px;">🎯 Pattern-Based Features</h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
-            <div style="padding: 16px; background: rgba(255,255,255,0.03); border-radius: 12px;">
+            <div style="padding: 16px; background: rgba(0,75,141,0.04); border-radius: 12px;">
                 <div style="font-size: 24px; margin-bottom: 8px;">🎨</div>
-                <div style="font-weight: 600; color: #e2e8f0; margin-bottom: 4px;">CLIP Pattern Understanding</div>
+                <div style="font-weight: 600; color: #1F2A44; margin-bottom: 4px;">CLIP Pattern Understanding</div>
                 <div style="font-size: 13px; color: #64748b;">Visual concepts, not pixel positions</div>
             </div>
-            <div style="padding: 16px; background: rgba(255,255,255,0.03); border-radius: 12px;">
+            <div style="padding: 16px; background: rgba(0,75,141,0.04); border-radius: 12px;">
                 <div style="font-size: 24px; margin-bottom: 8px;">🔄</div>
-                <div style="font-weight: 600; color: #e2e8f0; margin-bottom: 4px;">Scale & Rotation Robust</div>
+                <div style="font-weight: 600; color: #1F2A44; margin-bottom: 4px;">Scale & Rotation Robust</div>
                 <div style="font-size: 13px; color: #64748b;">Tests 0.85x–1.15x and -8° to +8°</div>
             </div>
-            <div style="padding: 16px; background: rgba(255,255,255,0.03); border-radius: 12px;">
+            <div style="padding: 16px; background: rgba(0,75,141,0.04); border-radius: 12px;">
                 <div style="font-size: 24px; margin-bottom: 8px;">🧩</div>
-                <div style="font-weight: 600; color: #e2e8f0; margin-bottom: 4px;">Patch-Level Matching</div>
+                <div style="font-weight: 600; color: #1F2A44; margin-bottom: 4px;">Patch-Level Matching</div>
                 <div style="font-size: 13px; color: #64748b;">7×7 grid, position-independent soft matching</div>
             </div>
-            <div style="padding: 16px; background: rgba(255,255,255,0.03); border-radius: 12px;">
+            <div style="padding: 16px; background: rgba(0,75,141,0.04); border-radius: 12px;">
                 <div style="font-size: 24px; margin-bottom: 8px;">🗺️</div>
-                <div style="font-weight: 600; color: #e2e8f0; margin-bottom: 4px;">Pattern Heatmap</div>
+                <div style="font-weight: 600; color: #1F2A44; margin-bottom: 4px;">Pattern Heatmap</div>
                 <div style="font-size: 13px; color: #64748b;">Shows WHICH regions match, not pixel diff</div>
             </div>
         </div>
