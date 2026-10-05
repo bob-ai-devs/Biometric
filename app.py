@@ -520,14 +520,27 @@ def run_gemini_analysis(ref_bytes, query_bytes, mode):
                  "ridge density and spacing, and visible minutiae (ridge endings, bifurcations). "
                  "Allow for rotation, shifts, partial prints and different scan sizes.")
     else:
-        focus = ("letterforms, stroke style and pressure, slant, proportions, baseline, connecting strokes and "
-                 "ligatures, pen-lift rhythm, and signs of tracing, hesitation or tremor. "
-                 "Allow for natural variation in size and position.")
+        focus = ("the overall structure and habitual style of the signature: general letterform shapes, "
+                 "stroke flow and rhythm, approximate slant, relative proportions, and distinctive flourishes or "
+                 "starting/ending strokes. Also watch for signs of tracing, hesitation or tremor.")
+
+    if mode == "Fingerprint":
+        strictness = ('Be strict and conservative: fingerprints are highly specific, so differences in pattern class, '
+                      'core/delta structure or minutiae are meaningful. If image quality or partial content makes the '
+                      'evidence insufficient, answer "inconclusive".')
+    else:
+        strictness = ('Be tolerant: genuine signatures naturally vary from one signing to the next (size, position, '
+                      'slight slant, speed, pen pressure, small shape differences, ink or scan quality). '
+                      'Do NOT treat minor or cosmetic differences as evidence of forgery - list them only as '
+                      'low-importance notes. Answer "mismatch" only when the fundamental structure or habitual style '
+                      'clearly differs, or there are strong signs of tracing or imitation. Answer "match" when the '
+                      'core style and structure are consistent despite normal variation, and "inconclusive" only '
+                      'when the evidence is genuinely unclear.')
 
     prompt = f"""You are assisting a bank's document-verification reviewer.
 Compare Image 1 (REFERENCE, ground truth) with Image 2 (QUERY, to verify). Both are {mode.lower()} samples.
 Judge from the images alone. Focus on: {focus}
-Be conservative: if image quality or partial content makes the evidence insufficient, answer "inconclusive".
+{strictness}
 Do not claim legal or forensic certainty - this is a screening aid for a human reviewer.
 
 Return ONLY a JSON object with exactly these keys:
@@ -536,7 +549,7 @@ Return ONLY a JSON object with exactly these keys:
   "confidence": integer 0-100 (your confidence in the verdict),
   "summary": "2-3 sentence plain-language explanation",
   "matching_features": ["up to 5 short strings"],
-  "differing_features": ["up to 5 short strings"],
+  "differing_features": ["up to 5 short strings; mark each as (minor) or (significant)"],
   "red_flags": ["short strings; empty list if none"],
   "reference_quality": "one short sentence",
   "query_quality": "one short sentence",
