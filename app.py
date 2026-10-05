@@ -680,7 +680,7 @@ def build_insights(patch_sim_map, final_score, best_global, patch_sim, global_si
     out = []
 
     def verdict_of(sc):
-        return "Authentic" if sc > 80 else "Review" if sc > 50 else "Forgery"
+        return "Match" if sc >= 80 else "Doubt" if sc >= 75 else "Mismatch"
 
     # 1. Spatial consistency (3x3 regions of the 7x7 patch grid)
     bands = np.array_split(np.arange(7), 3)
@@ -721,7 +721,7 @@ def build_insights(patch_sim_map, final_score, best_global, patch_sim, global_si
                         f"The match depends on alignment. {best_txt}"))
 
     # 4. Margin to the decision thresholds
-    thr_name, thr_val = min((("Authentic", 80.0), ("Review", 50.0)), key=lambda t: abs(final_score - t[1]))
+    thr_name, thr_val = min((("Match", 80.0), ("Mismatch", 75.0)), key=lambda t: abs(final_score - t[1]))
     margin = abs(final_score - thr_val)
     if margin < 5:
         out.append(("warn", "🎚️", "Borderline decision",
@@ -855,7 +855,7 @@ with st.sidebar:
     if st.session_state.verification_history:
         st.subheader("📜 Recent Scans")
         for entry in st.session_state.verification_history[-5:]:
-            status_color = "#1E8E3E" if entry['score'] > 80 else "#D97706" if entry['score'] > 50 else "#C62828"
+            status_color = {"MATCHED": "#1E8E3E", "REVIEW REQUIRED": "#D97706"}.get(entry['status'], "#C62828")
             st.markdown(f"""
             <div style="padding: 8px; border-radius: 8px; background: rgba(0,75,141,0.05); margin: 4px 0; border-left: 3px solid {status_color};">
                 <div style="font-size: 11px; color: #64748b;">{entry['time']}</div>
@@ -1141,10 +1141,13 @@ if uploaded_ref and uploaded_query:
         LVL_COLOR = {"green": "#1E8E3E", "amber": "#D97706", "red": "#C62828"}
         LVL_RANK = {"green": 2, "amber": 1, "red": 0}
 
-        score_color = "#1E8E3E" if final_score > 80 else "#D97706" if final_score > 50 else "#C62828"
+        # CLIP score bands: 80-100 match, 75-<80 doubt, <75 mismatch
+        CLIP_MATCH_T, CLIP_DOUBT_T = 80.0, 75.0
+        clip_level = "green" if final_score >= CLIP_MATCH_T else "amber" if final_score >= CLIP_DOUBT_T else "red"
+        score_color = LVL_COLOR[clip_level]
+        clip_zone = {"green": "match zone", "amber": "doubt zone", "red": "mismatch zone"}[clip_level]
+        # Gemini score / weighted final score bands (unchanged): above 80 match, above 50 review, otherwise mismatch
         score_level = lambda sc: "green" if sc > 80 else "amber" if sc > 50 else "red"
-        clip_level = score_level(final_score)
-        clip_zone = "match zone" if clip_level == "green" else "review band" if clip_level == "amber" else "low-match zone"
         gem_level = GV_LEVEL[gemini_result["verdict"]] if gemini_result else None
         gemini_score = float(gemini_result["match_score"]) if gemini_result else None
 
@@ -1165,17 +1168,23 @@ if uploaded_ref and uploaded_query:
         w_gem = 1.0 - w_clip
         combined_score = final_score * w_clip + (gemini_score * w_gem if gemini_result else 0.0)
         combined_score = float(min(100, max(0, combined_score)))
-        combined_level = score_level(combined_score)          # >80 matched, 50-80 review, <=50 mismatch
+        # With Gemini: >80 matched, 50-80 review, <=50 mismatch.  CLIP only: 80+ match, 75-<80 doubt, <75 mismatch.
+        combined_level = score_level(combined_score) if gemini_result else clip_level
         combined_color = LVL_COLOR[combined_level]
         status_text = {"green": "MATCHED", "amber": "REVIEW REQUIRED", "red": "MISMATCH"}[combined_level]
         dec_color = combined_color
         dec_icon = {"MATCHED": "✅", "REVIEW REQUIRED": "⚠️", "MISMATCH": "❌"}[status_text]
         decision_basis = (f"{round(w_clip * 100)}% CLIP + {round(w_gem * 100)}% Gemini" if gemini_result else "CLIP only")
 
-        _band = {"green": "match band (above 80%)", "amber": "review band (50-80%)", "red": "mismatch band (50% or below)"}[combined_level]
+        if gemini_result:
+            _band = {"green": "match band (above 80%)", "amber": "review band (50-80%)", "red": "mismatch band (50% or below)"}[combined_level]
+            _thr = (80.0, 50.0)
+        else:
+            _band = {"green": "match zone (80-100%)", "amber": "doubt zone (75-80%)", "red": "mismatch zone (below 75%)"}[combined_level]
+            _thr = (CLIP_MATCH_T, CLIP_DOUBT_T)
         decision_lean = (f"Weighted final score {combined_score:.1f}% falls in the {_band}." if gemini_result
                          else f"Based on the CLIP pattern engine only - {combined_score:.1f}% falls in the {_band}.")
-        _nearest = min((80.0, 50.0), key=lambda t: abs(combined_score - t))
+        _nearest = min(_thr, key=lambda t: abs(combined_score - t))
         if abs(combined_score - _nearest) < 5:
             decision_lean += f" It is close to the {_nearest:.0f}% line, so treat it as provisional."
         if agreement_label == "Conflict":
@@ -1343,7 +1352,7 @@ if uploaded_ref and uploaded_query:
             clip_items = [
                 ("#004B8D", f"Global pattern similarity is {best_global:.1f}% (unmodified query: {global_sim:.1f}%)."),
                 ("#004B8D", f"Local patch alignment is {patch_sim:.1f}%, with {n_strong_patches} of 49 patches strongly matched."),
-                (score_color, f"CLIP score {final_score:.1f}% falls in the {clip_zone} (match above 80%, review 50-80%, low match below 50%)."),
+                (score_color, f"CLIP score {final_score:.1f}% falls in the {clip_zone} (match 80-100%, doubt 75-80%, mismatch below 75%)."),
             ]
             warn_items = [(("#C62828" if sv == "bad" else "#D97706"), f"{t}: {_short(x, 150)}") for sv, _, t, x in insights if sv in ("warn", "bad")]
             clip_items += warn_items[:3] if warn_items else [("#1E8E3E", "No spatial, stability or image-quality warnings were raised.")]
@@ -1384,7 +1393,7 @@ if uploaded_ref and uploaded_query:
                 </div>
                 """, unsafe_allow_html=True)
 
-            st.caption("Final score = CLIP score x CLIP weight + Gemini score x Gemini weight (set in the sidebar). Above 80% = MATCHED, 50-80% = REVIEW REQUIRED, 50% or below = MISMATCH. This is a screening aid, not forensic proof.")
+            st.caption("Final score = CLIP score x CLIP weight + Gemini score x Gemini weight (set in the sidebar). Above 80% = MATCHED, 50-80% = REVIEW REQUIRED, 50% or below = MISMATCH. If Gemini is unavailable, the CLIP-only bands apply (80-100 match, 75-80 doubt, below 75 mismatch). This is a screening aid, not forensic proof.")
 
         with tab_metrics:
             # Reasoning chain
@@ -1421,7 +1430,7 @@ if uploaded_ref and uploaded_query:
 
             for col, (name, score, desc) in zip(mc, metrics):
                 with col:
-                    bc = "#1E8E3E" if score > 80 else "#D97706" if score > 50 else "#C62828"
+                    bc = "#1E8E3E" if score >= 80 else "#D97706" if score >= 75 else "#C62828"
                     st.markdown(f"""
                     <div style="text-align: center; padding: 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 8px 0;">
                         <div style="font-size: 28px; font-weight: 700; color: {bc}; font-family: 'Space Mono', monospace;">{score:.1f}%</div>
@@ -1616,7 +1625,7 @@ if uploaded_ref and uploaded_query:
             </div>
             """, unsafe_allow_html=True)
 
-            if final_score > 80:
+            if final_score >= 80:
                 assessment = f"""
                 **VERDICT: AUTHENTIC MATCH** ✅
 
@@ -1635,7 +1644,7 @@ if uploaded_ref and uploaded_query:
                 • Augmentation testing confirms pattern consistency across transformations
                 • A slightly larger signature or shifted fingerprint does NOT reduce this score
                 """
-            elif final_score > 50:
+            elif final_score >= 75:
                 assessment = f"""
                 **VERDICT: REVIEW REQUIRED** ⚠️
 
