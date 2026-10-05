@@ -1097,274 +1097,8 @@ if uploaded_ref and uploaded_query:
         if show_heatmap and patch_sim_map is not None:
             heatmap, overlay, upsampled = create_pattern_heatmap(patch_sim_map, ref_display, query_display)
 
-        # Results
-        st.markdown("""
-        <div class="verification-card" style="margin-top: 20px;">
-            <h2 style="text-align: center; color: #F15A22; margin-bottom: 24px;">📊 Pattern-Based Analysis Results</h2>
-        </div>
-        """, unsafe_allow_html=True)
-
-        score_color = "#1E8E3E" if final_score > 80 else "#D97706" if final_score > 50 else "#C62828"
-        status_text = "AUTHENTIC" if final_score > 80 else "REVIEW REQUIRED" if final_score > 50 else "LIKELY FORGERY"
-        status_icon = "✅" if final_score > 80 else "⚠️" if final_score > 50 else "❌"
-
-        st.markdown(f"""
-        <div style="text-align: center; padding: 30px;">
-            <div style="display: inline-block; position: relative;">
-                <div style="width: 180px; height: 180px; border-radius: 50%; 
-                            background: conic-gradient(from 0deg, {score_color} 0deg, {score_color} {final_score * 3.6}deg, rgba(0,75,141,0.12) {final_score * 3.6}deg);
-                            padding: 6px; display: flex; align-items: center; justify-content: center;">
-                    <div style="width: 168px; height: 168px; border-radius: 50%; background: #ffffff; 
-                                display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                        <div style="font-size: 48px; font-weight: 700; color: {score_color}; font-family: 'Space Mono', monospace;">
-                            {final_score:.1f}%
-                        </div>
-                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">PATTERN MATCH</div>
-                    </div>
-                </div>
-            </div>
-            <div style="margin-top: 20px; font-size: 24px; font-weight: 700; color: {score_color};">
-                {status_icon} {status_text}
-            </div>
-            <div style="margin-top: 8px; font-size: 13px; color: #64748b;">
-                Position & Scale Invariant | CLIP ViT-B/32 | Patch-Level Analysis
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Reasoning chain
-        if show_reasoning and analysis_steps:
-            st.markdown("""
-            <div class="verification-card" style="margin-top: 20px;">
-                <h3 style="color: #004B8D; margin-bottom: 16px;">🧠 Pattern Analysis Chain</h3>
-            </div>
-            """, unsafe_allow_html=True)
-
-            for i, step in enumerate(analysis_steps):
-                st.markdown(f"""
-                <div style="padding: 12px 16px; background: rgba(0, 75, 141, 0.05); border-radius: 8px; margin: 8px 0; border-left: 3px solid #004B8D;">
-                    <div style="font-size: 11px; color: #004B8D; font-weight: 700; margin-bottom: 4px;">STEP {i+1}</div>
-                    <div style="font-size: 13px; color: #1F2A44; line-height: 1.5;">{step}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        # Metrics
-        st.markdown("""
-        <div class="verification-card">
-            <h3 style="color: #F15A22; margin-bottom: 16px;">🔬 Pattern Metrics</h3>
-        </div>
-        """, unsafe_allow_html=True)
-
-        mc = st.columns(4)
-        metrics = [
-            ("Best Global", float(structural_score), "Best match across augmentations"),
-            ("Patch Align", float(correlation_score), "Local pattern matching (7×7 grid)"),
-            ("Avg Robust", float(edge_score), "Average across scale/rotation tests"),
-            ("Final Ensemble", float(ensemble_score), "Weighted pattern fusion")
-        ]
-
-        for col, (name, score, desc) in zip(mc, metrics):
-            with col:
-                bc = "#1E8E3E" if score > 80 else "#D97706" if score > 50 else "#C62828"
-                st.markdown(f"""
-                <div style="text-align: center; padding: 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 8px 0;">
-                    <div style="font-size: 28px; font-weight: 700; color: {bc}; font-family: 'Space Mono', monospace;">{score:.1f}%</div>
-                    <div style="font-size: 13px; font-weight: 600; color: #1F2A44; margin-top: 8px;">{name}</div>
-                    <div style="font-size: 11px; color: #64748b; margin-top: 4px;">{desc}</div>
-                    <div style="margin-top: 12px; height: 6px; background: rgba(0,0,0,0.08); border-radius: 3px; overflow: hidden;">
-                        <div style="width: {score:.1f}%; height: 100%; background: {bc}; border-radius: 3px;"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        # Pattern heatmap
-        if show_heatmap:
-            st.markdown("""
-            <div class="verification-card" style="margin-top: 20px;">
-                <h3 style="color: #F15A22; margin-bottom: 16px;">🎨 Pattern Match Heatmap</h3>
-                <p style="color: #64748b; font-size: 12px; margin-top: -8px;">
-                    Shows <b>which pattern regions match</b> (not pixel differences). 
-                    Green = similar patterns, Red = different patterns. Position-independent.
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-
-            vc = st.columns(2)
-            with vc[0]:
-                st.markdown("<div style='text-align: center; color: #475569; margin-bottom: 8px;'>🔥 Pattern Similarity Map</div>", unsafe_allow_html=True)
-                st.image(heatmap, use_container_width=True)
-                st.caption("Patch-level pattern similarity (7×7 CLIP patches upsampled)")
-
-            with vc[1]:
-                st.markdown("<div style='text-align: center; color: #475569; margin-bottom: 8px;'>🔍 Overlay on Reference</div>", unsafe_allow_html=True)
-                st.image(overlay, use_container_width=True)
-                st.caption("Pattern match regions overlaid on reference image")
-
-        # Feature breakdown
-        st.markdown("""
-        <div class="verification-card" style="margin-top: 20px;">
-            <h3 style="color: #F15A22; margin-bottom: 16px;">🧩 Pattern Feature Breakdown</h3>
-        </div>
-        """, unsafe_allow_html=True)
-
-        if mode == "Fingerprint":
-            features = [
-                ("Ridge Pattern Style", float(min(100, final_score * 1.05)), "#F15A22"),
-                ("Minutiae Distribution", float(min(100, patch_sim * 1.1 + 5)), "#004B8D"),
-                ("Core/Delta Structure", float(min(100, best_global * 0.95 + 8)), "#F5A100"),
-                ("Ridge Flow Direction", float(min(100, patch_sim * 0.9 + 12)), "#2F80C8"),
-                ("Pattern Density", float(min(100, final_score * 0.92 + 6)), "#C62828"),
-                ("Loop/Whirl Type", float(min(100, best_global * 1.0)), "#0B2D5B")
-            ]
-        else:
-            features = [
-                ("Stroke Style", float(min(100, final_score * 1.05)), "#F15A22"),
-                ("Pressure Pattern", float(min(100, patch_sim * 1.1 + 5)), "#004B8D"),
-                ("Curve Signature", float(min(100, best_global * 0.95 + 8)), "#F5A100"),
-                ("Pen Lift Rhythm", float(min(100, patch_sim * 0.9 + 12)), "#2F80C8"),
-                ("Aspect Proportion", float(min(100, final_score * 0.92 + 6)), "#C62828"),
-                ("Slant Characteristic", float(min(100, best_global * 1.0)), "#0B2D5B")
-            ]
-
-        fc = st.columns(3)
-        for i, (name, value, color) in enumerate(features):
-            with fc[i % 3]:
-                st.markdown(f"""
-                <div style="padding: 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 8px 0; border-left: 4px solid {color};">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 13px; font-weight: 600; color: #1F2A44;">{name}</span>
-                        <span style="font-size: 14px; font-weight: 700; color: {color}; font-family: 'Space Mono', monospace;">{value:.1f}%</span>
-                    </div>
-                    <div style="margin-top: 8px; height: 4px; background: rgba(0,0,0,0.08); border-radius: 2px; overflow: hidden;">
-                        <div style="width: {value:.1f}%; height: 100%; background: {color}; border-radius: 2px;"></div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        # Assessment Report
-        st.markdown("""
-        <div class="verification-card" style="margin-top: 20px;">
-            <h3 style="color: #F15A22; margin-bottom: 16px;">📝 Pattern-Based Assessment Report</h3>
-        </div>
-        """, unsafe_allow_html=True)
-
-        if final_score > 80:
-            assessment = f"""
-            **VERDICT: AUTHENTIC MATCH** ✅
-
-            The CLIP pattern analysis indicates a high-confidence match. The analysis is **position and scale invariant** — 
-            it compares the underlying biometric patterns, not exact pixel positions.
-
-            **Pattern Analysis:**
-            • Global pattern similarity (best across augmentations): {best_global:.1f}%
-            • Local patch alignment (7×7 grid): {patch_sim:.1f}%
-            • Tested {len(multi_scale_sims)} variants including different scales and rotations
-            • Best match found at non-original scale/rotation: +{best_global - global_sim:.1f}% improvement
-
-            **Why This Is Reliable:**
-            • CLIP understands visual patterns, not just pixels
-            • Patch-level matching allows patterns to be in different positions
-            • Augmentation testing confirms pattern consistency across transformations
-            • A slightly larger signature or shifted fingerprint does NOT reduce this score
-            """
-        elif final_score > 50:
-            assessment = f"""
-            **VERDICT: REVIEW REQUIRED** ⚠️
-
-            The pattern analysis shows moderate similarity. Some pattern elements match, but 
-            significant differences exist in the underlying biometric structure.
-
-            **Pattern Analysis:**
-            • Global pattern similarity (best across augmentations): {best_global:.1f}%
-            • Local patch alignment (7×7 grid): {patch_sim:.1f}%
-            • Tested {len(multi_scale_sims)} variants including different scales and rotations
-
-            **Areas of Concern:**
-            • Partial pattern mismatch in local regions (see heatmap)
-            • Inconsistent patch-level feature alignment
-            • Manual expert review recommended for final authentication
-            """
-        else:
-            assessment = f"""
-            **VERDICT: LIKELY FORGERY** ❌
-
-            The pattern analysis strongly suggests the query sample does not match the reference. 
-            Even after testing multiple scales and rotations, the underlying patterns differ significantly.
-
-            **Pattern Analysis:**
-            • Global pattern similarity (best across augmentations): {best_global:.1f}%
-            • Local patch alignment (7×7 grid): {patch_sim:.1f}%
-            • Tested {len(multi_scale_sims)} variants including different scales and rotations
-
-            **Red Flags:**
-            • Poor pattern correlation across all augmentations
-            • Local patch mismatches visible in pattern heatmap
-            • Different underlying ridge/stroke patterns detected
-            • Even position/shift invariant analysis cannot reconcile differences
-            """
-
-        # Convert markdown assessment to HTML for proper rendering inside styled div
-        import re
-
-        def md_to_html(text):
-            """Simple markdown to HTML converter for the assessment text."""
-            lines = text.strip().split("\n")
-            html_lines = []
-            in_list = False
-
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    if in_list:
-                        html_lines.append("</ul>")
-                        in_list = False
-                    html_lines.append("<br>")
-                    continue
-
-                # Headers
-                if line.startswith("**") and line.endswith("**"):
-                    html_lines.append(f"<h4 style='color: #F15A22; margin: 16px 0 8px 0; font-weight: 700;'>{line[2:-2]}</h4>")
-                    continue
-
-                # List items
-                if line.startswith("•"):
-                    if not in_list:
-                        html_lines.append("<ul style='margin: 8px 0; padding-left: 20px;'>")
-                        in_list = True
-                    item_text = line[1:].strip()
-                    # Bold text within list items
-                    item_text = re.sub(r'\*\*(.*?)\*\*', r'<strong style="color: #1F2A44;">\1</strong>', item_text)
-                    html_lines.append(f"<li style='color: #475569; margin: 4px 0; line-height: 1.6;'>{item_text}</li>")
-                    continue
-                else:
-                    if in_list:
-                        html_lines.append("</ul>")
-                        in_list = False
-
-                # Regular paragraph with bold support
-                line = re.sub(r'\*\*(.*?)\*\*', r'<strong style="color: #1F2A44;">\1</strong>', line)
-                html_lines.append(f"<p style='color: #475569; margin: 8px 0; line-height: 1.6;'>{line}</p>")
-
-            if in_list:
-                html_lines.append("</ul>")
-
-            return "\n".join(html_lines)
-
-        assessment_html = md_to_html(assessment)
-
-        st.markdown(f"""
-        <div style="background: rgba(0,75,141,0.04); border-radius: 12px; padding: 20px; border: 1px solid rgba(0,0,0,0.08);">
-            {assessment_html}
-            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.08);">
-                <div style="font-size: 11px; color: #64748b; font-family: 'Space Mono', monospace;">
-                    Pattern-Based Analysis | CLIP ViT-B/32 | Position & Scale Invariant | Patch-Level
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
         # ==========================================
-        # SMART INSIGHTS (local, no extra LLM)
+        # RUN LOCAL INSIGHTS + GEMINI, THEN COMBINE
         # ==========================================
         import html as _html
 
@@ -1374,125 +1108,65 @@ if uploaded_ref and uploaded_query:
             compute_quality_metrics(ref_bytes), compute_quality_metrics(query_bytes)
         )
 
-        st.markdown("""
-        <div class="verification-card" style="margin-top: 20px;">
-            <h3 style="color: #F15A22; margin-bottom: 8px;">💡 Smart Insights</h3>
-            <p style="color: #64748b; font-size: 12px; margin-top: -4px;">
-                Derived locally from the analysis above - spatial consistency, stability, decision margin,
-                image quality and input checks. No additional LLM involved.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        sev_color = {"ok": "#1E8E3E", "warn": "#D97706", "bad": "#C62828", "info": "#004B8D"}
-        ic = st.columns(2)
-        for i, (sev, icon, title, text) in enumerate(insights):
-            with ic[i % 2]:
-                st.markdown(f"""
-                <div style="padding: 14px 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 8px 0; border-left: 4px solid {sev_color[sev]};">
-                    <div style="font-size: 13px; font-weight: 700; color: #0B2D5B;">{icon} {_html.escape(title)}</div>
-                    <div style="font-size: 12.5px; color: #475569; margin-top: 4px; line-height: 1.55;">{_html.escape(text)}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        # ==========================================
-        # GEMINI VISION FINDINGS
-        # ==========================================
-        gemini_result, gemini_error, agreement_label = None, None, None
-
+        gemini_result, gemini_error = None, None
         if use_gemini:
-            st.markdown(f"""
-            <div class="verification-card" style="margin-top: 20px;">
-                <h3 style="color: #F15A22; margin-bottom: 8px;">✨ Gemini Vision Findings</h3>
-                <p style="color: #64748b; font-size: 12px; margin-top: -4px;">
-                    <code>{GEMINI_MODEL}</code> looked at both images independently of the CLIP scores.
-                    Treat it as a second opinion, not a ground truth.
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
+            with st.spinner("Gemini is examining both samples..."):
+                gemini_result, gemini_error = run_gemini_analysis(ref_bytes, query_bytes, mode)
 
-            if not get_gemini_key():
-                st.info("Gemini key not found. Add `GEMINI_API_KEY` in Streamlit Cloud -> Manage app -> Settings -> Secrets.")
+        GV_LEVEL = {"strong_match": "green", "weak_match": "green", "inconclusive": "amber", "verify": "amber", "mismatch": "red"}
+        GV_COLOR = {"strong_match": "#1E8E3E", "weak_match": "#6B9A1F", "inconclusive": "#D97706", "verify": "#F15A22", "mismatch": "#C62828"}
+        GV_ICON = {"strong_match": "✅", "weak_match": "☑️", "inconclusive": "⚠️", "verify": "🔍", "mismatch": "❌"}
+        GV_LABEL = {"strong_match": "STRONG MATCH", "weak_match": "WEAK MATCH", "inconclusive": "INCONCLUSIVE",
+                    "verify": "VERIFY MANUALLY", "mismatch": "MISMATCH"}
+        LVL_COLOR = {"green": "#1E8E3E", "amber": "#D97706", "red": "#C62828"}
+        LVL_RANK = {"green": 2, "amber": 1, "red": 0}
+
+        score_color = "#1E8E3E" if final_score > 80 else "#D97706" if final_score > 50 else "#C62828"
+        clip_level = "green" if final_score > 80 else "amber" if final_score > 50 else "red"
+        clip_zone = "match zone" if clip_level == "green" else "review band" if clip_level == "amber" else "low-match zone"
+        gem_level = GV_LEVEL[gemini_result["verdict"]] if gemini_result else None
+
+        # Combined decision: both green -> MATCHED, both red -> MISMATCH, anything else -> REVIEW REQUIRED
+        if gem_level is None:
+            decision_basis = "CLIP only"
+            status_text = {"green": "MATCHED", "amber": "REVIEW REQUIRED", "red": "MISMATCH"}[clip_level]
+            agreement_label = None
+        else:
+            decision_basis = "CLIP + Gemini"
+            if clip_level == gem_level == "green":
+                status_text = "MATCHED"
+            elif clip_level == gem_level == "red":
+                status_text = "MISMATCH"
             else:
-                with st.spinner("Gemini is examining both samples..."):
-                    gemini_result, gemini_error = run_gemini_analysis(ref_bytes, query_bytes, mode)
+                status_text = "REVIEW REQUIRED"
+            gap = abs(LVL_RANK[clip_level] - LVL_RANK[gem_level])
+            agreement_label = "Agree" if gap == 0 else "Partial" if gap == 1 else "Conflict"
 
-                if gemini_error:
-                    st.warning(f"Gemini analysis unavailable ({gemini_error}). The CLIP results above are unaffected.")
-                else:
-                    g = gemini_result
-                    gv_color = {"strong_match": "#1E8E3E", "weak_match": "#6B9A1F", "inconclusive": "#D97706",
-                                "verify": "#F15A22", "mismatch": "#C62828"}[g["verdict"]]
-                    gv_icon = {"strong_match": "✅", "weak_match": "☑️", "inconclusive": "⚠️",
-                               "verify": "🔍", "mismatch": "❌"}[g["verdict"]]
-                    gv_label = {"strong_match": "STRONG MATCH", "weak_match": "WEAK MATCH",
-                                "inconclusive": "INCONCLUSIVE", "verify": "VERIFY MANUALLY",
-                                "mismatch": "MISMATCH"}[g["verdict"]]
+        dec_color = {"MATCHED": "#1E8E3E", "REVIEW REQUIRED": "#D97706", "MISMATCH": "#C62828"}[status_text]
+        dec_icon = {"MATCHED": "✅", "REVIEW REQUIRED": "⚠️", "MISMATCH": "❌"}[status_text]
 
-                    clip_bucket = 2 if final_score > 80 else 1 if final_score > 50 else 0
-                    gem_bucket = {"strong_match": 2, "weak_match": 1, "inconclusive": 1, "verify": 1, "mismatch": 0}[g["verdict"]]
-                    gap = abs(clip_bucket - gem_bucket)
-                    agreement_label, ag_color, ag_text = (
-                        ("Agree", "#1E8E3E", "CLIP and Gemini reach the same conclusion.") if gap == 0 else
-                        ("Partial", "#D97706", "The two assessments differ by one level - review the details.") if gap == 1 else
-                        ("Conflict", "#C62828", "CLIP and Gemini disagree - manual review is strongly advised.")
-                    )
+        if gem_level is None:
+            decision_lean = f"Based on the CLIP pattern engine only ({clip_zone})."
+        elif status_text == "MATCHED":
+            decision_lean = ("Both engines agree the samples match." if gemini_result["verdict"] == "strong_match"
+                             else "Both engines lean towards a match; Gemini rates it a weak match, so confidence is moderate.")
+        elif status_text == "MISMATCH":
+            decision_lean = "Both engines agree the samples do not match."
+        elif {clip_level, gem_level} == {"green", "red"}:
+            decision_lean = "The engines conflict - one sees a match, the other a mismatch."
+        elif "green" in (clip_level, gem_level):
+            decision_lean = "Leaning towards a match, but one engine is not fully convinced."
+        elif "red" in (clip_level, gem_level):
+            decision_lean = "Leaning towards a mismatch, but one engine is not conclusive."
+        else:
+            decision_lean = "Neither engine is conclusive."
 
-                    def _li(items, color):
-                        if not items:
-                            return "<li style='color:#64748b;'>None noted</li>"
-                        return "".join(f"<li style='color:#475569; margin:4px 0; line-height:1.5;'>{_html.escape(x)}</li>" for x in items)
-
-                    st.markdown(f"""
-                    <div style="padding: 20px; background: rgba(0,75,141,0.04); border-radius: 12px; border: 1px solid rgba(0,0,0,0.08);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                            <div style="font-size: 22px; font-weight: 700; color: {gv_color};">{gv_icon} Gemini verdict: {gv_label}</div>
-                            <div style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: {ag_color}; border: 1px solid {ag_color};">
-                                CLIP vs Gemini: {agreement_label}
-                            </div>
-                        </div>
-                        <div style="margin-top: 12px; height: 6px; background: rgba(0,0,0,0.08); border-radius: 3px; overflow: hidden;">
-                            <div style="width: {g['confidence']}%; height: 100%; background: {gv_color}; border-radius: 3px;"></div>
-                        </div>
-                        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Gemini confidence: {g['confidence']}%</div>
-                        <p style="color: #1F2A44; margin: 14px 0 6px 0; line-height: 1.6;">{_html.escape(g['summary'])}</p>
-                        <p style="color: #64748b; font-size: 12px; margin: 0;">{ag_text}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    gc1, gc2 = st.columns(2)
-                    with gc1:
-                        st.markdown(f"""
-                        <div style="padding: 14px 16px; background: rgba(30,142,62,0.06); border-radius: 12px; margin: 10px 0; border-left: 4px solid #1E8E3E;">
-                            <div style="font-size: 13px; font-weight: 700; color: #1E8E3E;">Matching features</div>
-                            <ul style="margin: 8px 0 0 0; padding-left: 18px;">{_li(g['matching_features'], '#1E8E3E')}</ul>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    with gc2:
-                        st.markdown(f"""
-                        <div style="padding: 14px 16px; background: rgba(217,119,6,0.06); border-radius: 12px; margin: 10px 0; border-left: 4px solid #D97706;">
-                            <div style="font-size: 13px; font-weight: 700; color: #D97706;">Differing features</div>
-                            <ul style="margin: 8px 0 0 0; padding-left: 18px;">{_li(g['differing_features'], '#D97706')}</ul>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    if g["red_flags"]:
-                        st.markdown(f"""
-                        <div style="padding: 14px 16px; background: rgba(198,40,40,0.06); border-radius: 12px; margin: 10px 0; border-left: 4px solid #C62828;">
-                            <div style="font-size: 13px; font-weight: 700; color: #C62828;">🚩 Red flags</div>
-                            <ul style="margin: 8px 0 0 0; padding-left: 18px;">{_li(g['red_flags'], '#C62828')}</ul>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    st.markdown(f"""
-                    <div style="padding: 14px 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 10px 0; border-left: 4px solid #004B8D;">
-                        <div style="font-size: 12.5px; color: #475569; line-height: 1.6;">
-                            <b style="color:#0B2D5B;">Reference quality:</b> {_html.escape(g['reference_quality'])}<br>
-                            <b style="color:#0B2D5B;">Query quality:</b> {_html.escape(g['query_quality'])}<br>
-                            <b style="color:#0B2D5B;">Recommendation:</b> {_html.escape(g['recommendation'])}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+        decision_action = {
+            "MATCHED": "Proceed. The samples are consistent" + (" - Gemini's weak-match rating makes a quick visual check worthwhile."
+                                                                   if gemini_result and gemini_result["verdict"] == "weak_match" else "."),
+            "REVIEW REQUIRED": "Send to a human reviewer. The evidence is mixed or incomplete, so do not decide on the score alone.",
+            "MISMATCH": "Do not accept automatically. Escalate for manual / fraud verification before any action.",
+        }[status_text]
 
         # Save history
         st.session_state.verification_history.append({
@@ -1502,46 +1176,514 @@ if uploaded_ref and uploaded_query:
             'status': status_text
         })
 
-        # Export
+        # ==========================================
+        # RESULTS (tabbed)
+        # ==========================================
         st.markdown("""
         <div class="verification-card" style="margin-top: 20px;">
-            <h3 style="color: #F15A22; margin-bottom: 16px;">💾 Export Results</h3>
+            <h2 style="text-align: center; color: #F15A22; margin-bottom: 4px;">📊 Verification Results</h2>
+            <p style="text-align: center; color: #64748b; font-size: 12px; margin: 0;">
+                Combined decision from the CLIP pattern engine and Gemini vision review
+            </p>
         </div>
         """, unsafe_allow_html=True)
 
-        export_data = {
-            "timestamp": datetime.now().isoformat(),
-            "mode": mode,
-            "model": "openai/clip-vit-base-patch32",
-            "analysis_type": "pattern_based",
-            "position_invariant": True,
-            "scale_invariant": True,
-            "rotation_invariant": True,
-            "final_score": float(round(final_score, 2)),
-            "status": status_text,
-            "metrics": {
-                "best_global_similarity": float(round(best_global, 2)),
-                "patch_alignment": float(round(patch_sim, 2)),
-                "original_global": float(round(global_sim, 2)),
-                "augmentation_count": len(multi_scale_sims),
-                "augmentation_boost": float(round(best_global - global_sim, 2))
-            },
-            "settings": {
-                "sensitivity": float(sensitivity),
-                "tested_augmentations": bool(test_augmentations)
-            },
-            "insights": [{"severity": a, "title": c, "detail": d} for a, _, c, d in insights],
-            "gemini": ({"model": GEMINI_MODEL, **gemini_result} if gemini_result else None),
-            "clip_vs_gemini_agreement": agreement_label
-        }
-
-        json_str = json.dumps(export_data, indent=2, default=str)
-        st.download_button(
-            label="📥 Download JSON Report",
-            data=json_str,
-            file_name=f"biometric_pattern_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-            mime="application/json"
+        tab_dec, tab_metrics, tab_heat, tab_gem, tab_ins, tab_rep = st.tabs(
+            ["🎯 Decision", "📊 Metrics", "🗺️ Heatmap", "✨ Gemini", "💡 Insights", "📝 Report"]
         )
+
+        with tab_dec:
+            def _pill(label, value, color):
+                return (f'<span style="display:inline-block; padding:5px 12px; border-radius:20px; font-size:12px; '
+                        f'font-weight:700; color:{color}; border:1px solid {color}; background:#ffffff; margin:0 8px 8px 0;">'
+                        f'{label}: {value}</span>')
+
+            def _bullets(items):
+                return "".join(
+                    f'<li style="margin:7px 0; color:#475569; line-height:1.55; font-size:13px;">'
+                    f'<span style="color:{c}; font-weight:700;">●</span> {_html.escape(t)}</li>' for c, t in items)
+
+            def _short(t, n=190):
+                return t if len(t) <= n else t[:n].rsplit(" ", 1)[0] + "..."
+
+            hero_l, hero_r = st.columns([1, 2])
+            with hero_l:
+                st.markdown(f"""
+                <div style="text-align: center; padding: 18px 0;">
+                    <div style="display: inline-block;">
+                        <div style="width: 170px; height: 170px; border-radius: 50%;
+                                    background: conic-gradient(from 0deg, {score_color} 0deg, {score_color} {final_score * 3.6}deg, rgba(0,75,141,0.12) {final_score * 3.6}deg);
+                                    padding: 6px; display: flex; align-items: center; justify-content: center;">
+                            <div style="width: 158px; height: 158px; border-radius: 50%; background: #ffffff;
+                                        display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                <div style="font-size: 40px; font-weight: 700; color: {score_color}; font-family: 'Space Mono', monospace;">{final_score:.1f}%</div>
+                                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">CLIP PATTERN MATCH</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            with hero_r:
+                gem_pill = (_pill("Gemini", f"{GV_ICON[gemini_result['verdict']]} {GV_LABEL[gemini_result['verdict']]}", GV_COLOR[gemini_result["verdict"]])
+                            if gemini_result else _pill("Gemini", "not used", "#64748b"))
+                agree_pill = (_pill("Agreement", agreement_label, {"Agree": "#1E8E3E", "Partial": "#D97706", "Conflict": "#C62828"}[agreement_label])
+                              if agreement_label else "")
+                st.markdown(f"""
+                <div style="padding: 22px 26px; border-radius: 16px; background: linear-gradient(135deg, {dec_color}14, #ffffff); border: 1px solid {dec_color}55; margin-top: 8px;">
+                    <div style="font-size: 11px; letter-spacing: 1.5px; color: #64748b; font-weight: 700;">FINAL DECISION · {decision_basis.upper()}</div>
+                    <div style="font-size: 36px; font-weight: 800; color: {dec_color}; margin: 4px 0 2px 0;">{dec_icon} {status_text}</div>
+                    <div style="font-size: 14px; color: #1F2A44; margin-bottom: 14px;">{_html.escape(decision_lean)}</div>
+                    <div>
+                        {_pill("CLIP", f"{final_score:.1f}% · {clip_zone}", score_color)}
+                        {gem_pill}
+                        {agree_pill}
+                    </div>
+                    <div style="margin-top: 6px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.08); font-size: 13px; color: #475569; line-height: 1.55;">
+                        <b style="color: #0B2D5B;">Recommended action:</b> {_html.escape(decision_action)}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+            st.markdown("<h4 style='color: #0B2D5B; margin: 8px 0;'>🧾 Why this decision</h4>", unsafe_allow_html=True)
+
+            # --- reasons: CLIP engine ---
+            n_strong_patches = int((patch_sim_map > 0.7).sum())
+            clip_items = [
+                ("#004B8D", f"Global pattern similarity is {best_global:.1f}% (unmodified query: {global_sim:.1f}%)."),
+                ("#004B8D", f"Local patch alignment is {patch_sim:.1f}%, with {n_strong_patches} of 49 patches strongly matched."),
+                (score_color, f"Final score {final_score:.1f}% falls in the {clip_zone} (match above 80%, review 50-80%, low match below 50%)."),
+            ]
+            warn_items = [(("#C62828" if sv == "bad" else "#D97706"), f"{t}: {_short(x, 150)}") for sv, _, t, x in insights if sv in ("warn", "bad")]
+            clip_items += warn_items[:3] if warn_items else [("#1E8E3E", "No spatial, stability or image-quality warnings were raised.")]
+
+            # --- reasons: Gemini ---
+            if gemini_result:
+                g = gemini_result
+                gem_body = f'<p style="color:#1F2A44; font-size:13px; line-height:1.6; margin:0 0 6px 0;">{_html.escape(g["summary"])}</p>'
+                gem_items = ([("#1E8E3E", x) for x in g["matching_features"][:3]]
+                             + [("#D97706", x) for x in g["differing_features"][:3]]
+                             + [("#C62828", "Red flag: " + x) for x in g["red_flags"][:2]])
+                gem_body += f'<ul style="list-style:none; padding-left:0; margin:6px 0 0 0;">{_bullets(gem_items)}</ul>'
+                gem_title_color = GV_COLOR[g["verdict"]]
+                gem_title = f'{GV_ICON[g["verdict"]]} Gemini · {GV_LABEL[g["verdict"]]} ({g["confidence"]}% confidence)'
+            else:
+                if not use_gemini:
+                    msg = "Gemini review is switched off in the sidebar, so this decision rests on the CLIP engine alone."
+                elif gemini_error == "no_key":
+                    msg = "No Gemini API key was found. Add GEMINI_API_KEY to the app secrets to enable the second opinion."
+                else:
+                    msg = f"Gemini was unavailable for this run ({gemini_error}). The decision rests on the CLIP engine alone."
+                gem_body = f'<p style="color:#64748b; font-size:13px; line-height:1.6; margin:0;">{_html.escape(msg)}</p>'
+                gem_title_color, gem_title = "#64748b", "✨ Gemini · not available"
+
+            rc1, rc2 = st.columns(2)
+            with rc1:
+                st.markdown(f"""
+                <div style="padding: 18px 20px; background: #ffffff; border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); border-top: 4px solid {score_color}; min-height: 100%;">
+                    <div style="font-size: 14px; font-weight: 700; color: {score_color}; margin-bottom: 8px;">📐 CLIP pattern engine · {final_score:.1f}%</div>
+                    <ul style="list-style:none; padding-left:0; margin:0;">{_bullets(clip_items)}</ul>
+                </div>
+                """, unsafe_allow_html=True)
+            with rc2:
+                st.markdown(f"""
+                <div style="padding: 18px 20px; background: #ffffff; border-radius: 14px; border: 1px solid rgba(0,0,0,0.08); border-top: 4px solid {gem_title_color}; min-height: 100%;">
+                    <div style="font-size: 14px; font-weight: 700; color: {gem_title_color}; margin-bottom: 8px;">{gem_title}</div>
+                    {gem_body}
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.caption("Rule: both engines green = MATCHED · both red = MISMATCH · anything else = REVIEW REQUIRED. This is a screening aid, not forensic proof.")
+
+        with tab_metrics:
+            # Reasoning chain
+            if show_reasoning and analysis_steps:
+                st.markdown("""
+                <div class="verification-card" style="margin-top: 20px;">
+                    <h3 style="color: #004B8D; margin-bottom: 16px;">🧠 Pattern Analysis Chain</h3>
+                </div>
+                """, unsafe_allow_html=True)
+
+                for i, step in enumerate(analysis_steps):
+                    st.markdown(f"""
+                    <div style="padding: 12px 16px; background: rgba(0, 75, 141, 0.05); border-radius: 8px; margin: 8px 0; border-left: 3px solid #004B8D;">
+                        <div style="font-size: 11px; color: #004B8D; font-weight: 700; margin-bottom: 4px;">STEP {i+1}</div>
+                        <div style="font-size: 13px; color: #1F2A44; line-height: 1.5;">{step}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+
+            # Metrics
+            st.markdown("""
+            <div class="verification-card">
+                <h3 style="color: #F15A22; margin-bottom: 16px;">🔬 Pattern Metrics</h3>
+            </div>
+            """, unsafe_allow_html=True)
+
+            mc = st.columns(4)
+            metrics = [
+                ("Best Global", float(structural_score), "Best match across augmentations"),
+                ("Patch Align", float(correlation_score), "Local pattern matching (7×7 grid)"),
+                ("Avg Robust", float(edge_score), "Average across scale/rotation tests"),
+                ("Final Ensemble", float(ensemble_score), "Weighted pattern fusion")
+            ]
+
+            for col, (name, score, desc) in zip(mc, metrics):
+                with col:
+                    bc = "#1E8E3E" if score > 80 else "#D97706" if score > 50 else "#C62828"
+                    st.markdown(f"""
+                    <div style="text-align: center; padding: 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 8px 0;">
+                        <div style="font-size: 28px; font-weight: 700; color: {bc}; font-family: 'Space Mono', monospace;">{score:.1f}%</div>
+                        <div style="font-size: 13px; font-weight: 600; color: #1F2A44; margin-top: 8px;">{name}</div>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">{desc}</div>
+                        <div style="margin-top: 12px; height: 6px; background: rgba(0,0,0,0.08); border-radius: 3px; overflow: hidden;">
+                            <div style="width: {score:.1f}%; height: 100%; background: {bc}; border-radius: 3px;"></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+
+            # Feature breakdown
+            st.markdown("""
+            <div class="verification-card" style="margin-top: 20px;">
+                <h3 style="color: #F15A22; margin-bottom: 16px;">🧩 Pattern Feature Breakdown</h3>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if mode == "Fingerprint":
+                features = [
+                    ("Ridge Pattern Style", float(min(100, final_score * 1.05)), "#F15A22"),
+                    ("Minutiae Distribution", float(min(100, patch_sim * 1.1 + 5)), "#004B8D"),
+                    ("Core/Delta Structure", float(min(100, best_global * 0.95 + 8)), "#F5A100"),
+                    ("Ridge Flow Direction", float(min(100, patch_sim * 0.9 + 12)), "#2F80C8"),
+                    ("Pattern Density", float(min(100, final_score * 0.92 + 6)), "#C62828"),
+                    ("Loop/Whirl Type", float(min(100, best_global * 1.0)), "#0B2D5B")
+                ]
+            else:
+                features = [
+                    ("Stroke Style", float(min(100, final_score * 1.05)), "#F15A22"),
+                    ("Pressure Pattern", float(min(100, patch_sim * 1.1 + 5)), "#004B8D"),
+                    ("Curve Signature", float(min(100, best_global * 0.95 + 8)), "#F5A100"),
+                    ("Pen Lift Rhythm", float(min(100, patch_sim * 0.9 + 12)), "#2F80C8"),
+                    ("Aspect Proportion", float(min(100, final_score * 0.92 + 6)), "#C62828"),
+                    ("Slant Characteristic", float(min(100, best_global * 1.0)), "#0B2D5B")
+                ]
+
+            fc = st.columns(3)
+            for i, (name, value, color) in enumerate(features):
+                with fc[i % 3]:
+                    st.markdown(f"""
+                    <div style="padding: 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 8px 0; border-left: 4px solid {color};">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 600; color: #1F2A44;">{name}</span>
+                            <span style="font-size: 14px; font-weight: 700; color: {color}; font-family: 'Space Mono', monospace;">{value:.1f}%</span>
+                        </div>
+                        <div style="margin-top: 8px; height: 4px; background: rgba(0,0,0,0.08); border-radius: 2px; overflow: hidden;">
+                            <div style="width: {value:.1f}%; height: 100%; background: {color}; border-radius: 2px;"></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+
+        with tab_heat:
+            # Pattern heatmap
+            if show_heatmap:
+                st.markdown("""
+                <div class="verification-card" style="margin-top: 20px;">
+                    <h3 style="color: #F15A22; margin-bottom: 16px;">🎨 Pattern Match Heatmap</h3>
+                    <p style="color: #64748b; font-size: 12px; margin-top: -8px;">
+                        Shows <b>which pattern regions match</b> (not pixel differences). 
+                        Green = similar patterns, Red = different patterns. Position-independent.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                vc = st.columns(2)
+                with vc[0]:
+                    st.markdown("<div style='text-align: center; color: #475569; margin-bottom: 8px;'>🔥 Pattern Similarity Map</div>", unsafe_allow_html=True)
+                    st.image(heatmap, use_container_width=True)
+                    st.caption("Patch-level pattern similarity (7×7 CLIP patches upsampled)")
+
+                with vc[1]:
+                    st.markdown("<div style='text-align: center; color: #475569; margin-bottom: 8px;'>🔍 Overlay on Reference</div>", unsafe_allow_html=True)
+                    st.image(overlay, use_container_width=True)
+                    st.caption("Pattern match regions overlaid on reference image")
+
+
+            else:
+                st.info("Pattern heatmap is switched off in the sidebar.")
+
+        with tab_gem:
+            st.markdown(f"""
+            <div class="verification-card">
+                <h3 style="color: #F15A22; margin-bottom: 8px;">✨ Gemini Vision Findings</h3>
+                <p style="color: #64748b; font-size: 12px; margin-top: -4px;">
+                    <code>{GEMINI_MODEL}</code> looked at both images independently of the CLIP scores.
+                    Treat it as a second opinion, not a ground truth.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if not gemini_result:
+                if not use_gemini:
+                    st.info("Gemini Vision Findings is switched off in the sidebar.")
+                elif gemini_error == "no_key":
+                    st.info("Gemini key not found. Add `GEMINI_API_KEY` in Streamlit Cloud -> Manage app -> Settings -> Secrets.")
+                else:
+                    st.warning(f"Gemini analysis unavailable ({gemini_error}). The CLIP results are unaffected.")
+            else:
+                g = gemini_result
+                gv_color, gv_icon, gv_label = GV_COLOR[g["verdict"]], GV_ICON[g["verdict"]], GV_LABEL[g["verdict"]]
+                ag_color = {"Agree": "#1E8E3E", "Partial": "#D97706", "Conflict": "#C62828"}[agreement_label]
+                ag_text = {"Agree": "CLIP and Gemini reach the same conclusion.",
+                           "Partial": "The two assessments differ by one level - review the details.",
+                           "Conflict": "CLIP and Gemini disagree - manual review is strongly advised."}[agreement_label]
+
+                def _li(items):
+                    if not items:
+                        return "<li style='color:#64748b;'>None noted</li>"
+                    return "".join(f"<li style='color:#475569; margin:4px 0; line-height:1.5;'>{_html.escape(x)}</li>" for x in items)
+
+                st.markdown(f"""
+                <div style="padding: 20px; background: rgba(0,75,141,0.04); border-radius: 12px; border: 1px solid rgba(0,0,0,0.08);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div style="font-size: 22px; font-weight: 700; color: {gv_color};">{gv_icon} Gemini verdict: {gv_label}</div>
+                        <div style="padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: {ag_color}; border: 1px solid {ag_color};">
+                            CLIP vs Gemini: {agreement_label}
+                        </div>
+                    </div>
+                    <div style="margin-top: 12px; height: 6px; background: rgba(0,0,0,0.08); border-radius: 3px; overflow: hidden;">
+                        <div style="width: {g['confidence']}%; height: 100%; background: {gv_color}; border-radius: 3px;"></div>
+                    </div>
+                    <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Gemini confidence: {g['confidence']}%</div>
+                    <p style="color: #1F2A44; margin: 14px 0 6px 0; line-height: 1.6;">{_html.escape(g['summary'])}</p>
+                    <p style="color: #64748b; font-size: 12px; margin: 0;">{ag_text}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                gc1, gc2 = st.columns(2)
+                with gc1:
+                    st.markdown(f"""
+                    <div style="padding: 14px 16px; background: rgba(30,142,62,0.06); border-radius: 12px; margin: 10px 0; border-left: 4px solid #1E8E3E;">
+                        <div style="font-size: 13px; font-weight: 700; color: #1E8E3E;">Matching features</div>
+                        <ul style="margin: 8px 0 0 0; padding-left: 18px;">{_li(g['matching_features'])}</ul>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with gc2:
+                    st.markdown(f"""
+                    <div style="padding: 14px 16px; background: rgba(217,119,6,0.06); border-radius: 12px; margin: 10px 0; border-left: 4px solid #D97706;">
+                        <div style="font-size: 13px; font-weight: 700; color: #D97706;">Differing features</div>
+                        <ul style="margin: 8px 0 0 0; padding-left: 18px;">{_li(g['differing_features'])}</ul>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                if g["red_flags"]:
+                    st.markdown(f"""
+                    <div style="padding: 14px 16px; background: rgba(198,40,40,0.06); border-radius: 12px; margin: 10px 0; border-left: 4px solid #C62828;">
+                        <div style="font-size: 13px; font-weight: 700; color: #C62828;">🚩 Red flags</div>
+                        <ul style="margin: 8px 0 0 0; padding-left: 18px;">{_li(g['red_flags'])}</ul>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown(f"""
+                <div style="padding: 14px 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 10px 0; border-left: 4px solid #004B8D;">
+                    <div style="font-size: 12.5px; color: #475569; line-height: 1.6;">
+                        <b style="color:#0B2D5B;">Reference quality:</b> {_html.escape(g['reference_quality'])}<br>
+                        <b style="color:#0B2D5B;">Query quality:</b> {_html.escape(g['query_quality'])}<br>
+                        <b style="color:#0B2D5B;">Recommendation:</b> {_html.escape(g['recommendation'])}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        with tab_ins:
+            st.markdown("""
+            <div class="verification-card">
+                <h3 style="color: #F15A22; margin-bottom: 8px;">💡 Smart Insights</h3>
+                <p style="color: #64748b; font-size: 12px; margin-top: -4px;">
+                    Derived locally from the analysis - spatial consistency, stability, decision margin,
+                    image quality and input checks. No additional LLM involved.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            sev_color = {"ok": "#1E8E3E", "warn": "#D97706", "bad": "#C62828", "info": "#004B8D"}
+            ic = st.columns(2)
+            for i, (sev, icon, title, text) in enumerate(insights):
+                with ic[i % 2]:
+                    st.markdown(f"""
+                    <div style="padding: 14px 16px; background: rgba(0,75,141,0.04); border-radius: 12px; margin: 8px 0; border-left: 4px solid {sev_color[sev]};">
+                        <div style="font-size: 13px; font-weight: 700; color: #0B2D5B;">{icon} {_html.escape(title)}</div>
+                        <div style="font-size: 12.5px; color: #475569; margin-top: 4px; line-height: 1.55;">{_html.escape(text)}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        with tab_rep:
+            # Assessment Report
+            st.markdown("""
+            <div class="verification-card" style="margin-top: 20px;">
+                <h3 style="color: #F15A22; margin-bottom: 16px;">📝 Pattern-Based Assessment Report</h3>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if final_score > 80:
+                assessment = f"""
+                **VERDICT: AUTHENTIC MATCH** ✅
+
+                The CLIP pattern analysis indicates a high-confidence match. The analysis is **position and scale invariant** — 
+                it compares the underlying biometric patterns, not exact pixel positions.
+
+                **Pattern Analysis:**
+                • Global pattern similarity (best across augmentations): {best_global:.1f}%
+                • Local patch alignment (7×7 grid): {patch_sim:.1f}%
+                • Tested {len(multi_scale_sims)} variants including different scales and rotations
+                • Best match found at non-original scale/rotation: +{best_global - global_sim:.1f}% improvement
+
+                **Why This Is Reliable:**
+                • CLIP understands visual patterns, not just pixels
+                • Patch-level matching allows patterns to be in different positions
+                • Augmentation testing confirms pattern consistency across transformations
+                • A slightly larger signature or shifted fingerprint does NOT reduce this score
+                """
+            elif final_score > 50:
+                assessment = f"""
+                **VERDICT: REVIEW REQUIRED** ⚠️
+
+                The pattern analysis shows moderate similarity. Some pattern elements match, but 
+                significant differences exist in the underlying biometric structure.
+
+                **Pattern Analysis:**
+                • Global pattern similarity (best across augmentations): {best_global:.1f}%
+                • Local patch alignment (7×7 grid): {patch_sim:.1f}%
+                • Tested {len(multi_scale_sims)} variants including different scales and rotations
+
+                **Areas of Concern:**
+                • Partial pattern mismatch in local regions (see heatmap)
+                • Inconsistent patch-level feature alignment
+                • Manual expert review recommended for final authentication
+                """
+            else:
+                assessment = f"""
+                **VERDICT: LIKELY FORGERY** ❌
+
+                The pattern analysis strongly suggests the query sample does not match the reference. 
+                Even after testing multiple scales and rotations, the underlying patterns differ significantly.
+
+                **Pattern Analysis:**
+                • Global pattern similarity (best across augmentations): {best_global:.1f}%
+                • Local patch alignment (7×7 grid): {patch_sim:.1f}%
+                • Tested {len(multi_scale_sims)} variants including different scales and rotations
+
+                **Red Flags:**
+                • Poor pattern correlation across all augmentations
+                • Local patch mismatches visible in pattern heatmap
+                • Different underlying ridge/stroke patterns detected
+                • Even position/shift invariant analysis cannot reconcile differences
+                """
+
+            # Convert markdown assessment to HTML for proper rendering inside styled div
+            import re
+
+            def md_to_html(text):
+                """Simple markdown to HTML converter for the assessment text."""
+                lines = text.strip().split("\n")
+                html_lines = []
+                in_list = False
+
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        if in_list:
+                            html_lines.append("</ul>")
+                            in_list = False
+                        html_lines.append("<br>")
+                        continue
+
+                    # Headers
+                    if line.startswith("**") and line.endswith("**"):
+                        html_lines.append(f"<h4 style='color: #F15A22; margin: 16px 0 8px 0; font-weight: 700;'>{line[2:-2]}</h4>")
+                        continue
+
+                    # List items
+                    if line.startswith("•"):
+                        if not in_list:
+                            html_lines.append("<ul style='margin: 8px 0; padding-left: 20px;'>")
+                            in_list = True
+                        item_text = line[1:].strip()
+                        # Bold text within list items
+                        item_text = re.sub(r'\*\*(.*?)\*\*', r'<strong style="color: #1F2A44;">\1</strong>', item_text)
+                        html_lines.append(f"<li style='color: #475569; margin: 4px 0; line-height: 1.6;'>{item_text}</li>")
+                        continue
+                    else:
+                        if in_list:
+                            html_lines.append("</ul>")
+                            in_list = False
+
+                    # Regular paragraph with bold support
+                    line = re.sub(r'\*\*(.*?)\*\*', r'<strong style="color: #1F2A44;">\1</strong>', line)
+                    html_lines.append(f"<p style='color: #475569; margin: 8px 0; line-height: 1.6;'>{line}</p>")
+
+                if in_list:
+                    html_lines.append("</ul>")
+
+                return "\n".join(html_lines)
+
+            assessment_html = md_to_html(assessment)
+
+            st.markdown(f"""
+            <div style="background: rgba(0,75,141,0.04); border-radius: 12px; padding: 20px; border: 1px solid rgba(0,0,0,0.08);">
+                {assessment_html}
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(0,0,0,0.08);">
+                    <div style="font-size: 11px; color: #64748b; font-family: 'Space Mono', monospace;">
+                        Pattern-Based Analysis | CLIP ViT-B/32 | Position & Scale Invariant | Patch-Level
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+            # Export
+            st.markdown("""
+            <div class="verification-card" style="margin-top: 20px;">
+                <h3 style="color: #F15A22; margin-bottom: 16px;">💾 Export Results</h3>
+            </div>
+            """, unsafe_allow_html=True)
+
+            export_data = {
+                "timestamp": datetime.now().isoformat(),
+                "mode": mode,
+                "model": "openai/clip-vit-base-patch32",
+                "analysis_type": "pattern_based",
+                "position_invariant": True,
+                "scale_invariant": True,
+                "rotation_invariant": True,
+                "final_score": float(round(final_score, 2)),
+                "status": status_text,
+                "metrics": {
+                    "best_global_similarity": float(round(best_global, 2)),
+                    "patch_alignment": float(round(patch_sim, 2)),
+                    "original_global": float(round(global_sim, 2)),
+                    "augmentation_count": len(multi_scale_sims),
+                    "augmentation_boost": float(round(best_global - global_sim, 2))
+                },
+                "settings": {
+                    "sensitivity": float(sensitivity),
+                    "tested_augmentations": bool(test_augmentations)
+                },
+                "insights": [{"severity": a, "title": c, "detail": d} for a, _, c, d in insights],
+                "gemini": ({"model": GEMINI_MODEL, **gemini_result} if gemini_result else None),
+                "clip_vs_gemini_agreement": agreement_label,
+                "final_decision": {"status": status_text, "basis": decision_basis, "assessment": decision_lean}
+            }
+
+            json_str = json.dumps(export_data, indent=2, default=str)
+            st.download_button(
+                label="📥 Download JSON Report",
+                data=json_str,
+                file_name=f"biometric_pattern_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json",
+                on_click="ignore"
+            )
+
 
 else:
     st.markdown("""
